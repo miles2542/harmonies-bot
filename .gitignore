@@ -1,0 +1,14 @@
+dev_docs/
+logs/
+temp/
+
+target/
+dist/
+node_modules/
+.venv/
+__pycache__/
+.ruff_cache/
+.mypy_cache/
+
+*.log
+*.tmp

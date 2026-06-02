@@ -1,0 +1,21 @@
+{
+  "manifest_version": 2,
+  "name": "Harmonies BGA Advisor",
+  "version": "0.1.0",
+  "description": "Read-only Harmonies advisor overlay for active BGA participants.",
+  "permissions": ["https://boardgamearena.com/*", "https://*.boardgamearena.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://boardgamearena.com/*", "https://*.boardgamearena.com/*"],
+      "js": ["src/overlay.js", "src/mockAdvisor.js", "src/advisorClient.js", "src/contentScript.js"],
+      "css": ["src/styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": ["src/pageBridge.js"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "harmonies-bga-advisor@local"
+    }
+  }
+}

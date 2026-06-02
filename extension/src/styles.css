@@ -1,0 +1,67 @@
+#harmonies-advisor-root {
+  position: fixed;
+  right: 16px;
+  top: 96px;
+  z-index: 9999;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  color: #1f2933;
+  background: #f8fafc;
+  border: 1px solid #8795a1;
+  border-radius: 8px;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.22);
+  font: 13px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.harmonies-advisor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: #243b53;
+  color: #f8fafc;
+  border-radius: 7px 7px 0 0;
+}
+
+.harmonies-advisor-header button {
+  width: 28px;
+  height: 24px;
+  border: 1px solid #bcccdc;
+  border-radius: 4px;
+  color: #f8fafc;
+  background: transparent;
+  cursor: pointer;
+}
+
+.harmonies-advisor-body {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+#harmonies-advisor-root.is-collapsed .harmonies-advisor-body {
+  display: none;
+}
+
+.harmonies-advisor-status {
+  color: #52606d;
+}
+
+.harmonies-advisor-best {
+  font-weight: 700;
+}
+
+.harmonies-advisor-steps {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.harmonies-advisor-alt {
+  padding: 4px 0;
+  border-top: 1px solid #d9e2ec;
+}
+
+.harmonies-advisor-highlight {
+  outline: 4px solid #f0b429 !important;
+  outline-offset: 3px !important;
+}

@@ -1,0 +1,13 @@
+[package]
+name = "harmonies-cli"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+anyhow = "1"
+harmonies-core = { path = "../harmonies-core" }
+serde_json = "1"
+
+[lints]
+workspace = true
