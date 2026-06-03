@@ -10,7 +10,10 @@ pub mod scoring;
 pub mod search;
 pub mod turn;
 
-pub use advisor::{advise, advise_with_progress, AdvisorRequestV1, AdvisorResponseV1, MovePlanV1};
+pub use advisor::{
+    advise, advise_with_progress, advise_with_progress_and_cancel, AdvisorRequestV1,
+    AdvisorResponseV1, MovePlanV1,
+};
 pub use cards::{CardCatalog, CardPatternStep};
 pub use eval::EvalWeights;
 pub use model::{

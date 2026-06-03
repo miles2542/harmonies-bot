@@ -87,6 +87,14 @@ pub fn advise_with_progress(
     request: AdvisorRequestV1,
     mut on_progress: impl FnMut(AdvisorResponseV1),
 ) -> AdvisorResponseV1 {
+    advise_with_progress_and_cancel(request, &mut on_progress, || false)
+}
+
+pub fn advise_with_progress_and_cancel(
+    request: AdvisorRequestV1,
+    mut on_progress: impl FnMut(AdvisorResponseV1),
+    should_cancel: impl Fn() -> bool,
+) -> AdvisorResponseV1 {
     let started = Instant::now();
     let mut warnings = Vec::new();
 
@@ -125,6 +133,7 @@ pub fn advise_with_progress(
         request.seed,
         request.time_budget_ms,
         started,
+        should_cancel,
         |outcome| {
             on_progress(response_from_outcome(
                 &outcome,

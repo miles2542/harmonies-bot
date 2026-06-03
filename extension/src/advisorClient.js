@@ -10,6 +10,7 @@
     field: "Field",
     building: "Building",
   };
+  let activeSocket = null;
 
   function createAdvisorClient() {
     return {
@@ -22,6 +23,11 @@
           const mock = window.HarmoniesMockAdvisor.recommend(snapshot);
           mock.status = `Mock advisor active; native service unavailable: ${error.message}`;
           return mock;
+        }
+      },
+      stop() {
+        if (activeSocket?.readyState === WebSocket.OPEN) {
+          activeSocket.send(JSON.stringify({ command: "stop" }));
         }
       },
     };
@@ -68,6 +74,7 @@
   function requestNativeAdvisorWs(request, onUpdate) {
     return new Promise((resolve, reject) => {
       const socket = new WebSocket(SERVICE_WS_URL);
+      activeSocket = socket;
       let settled = false;
       const timeout = setTimeout(() => {
         socket.close();
@@ -84,6 +91,7 @@
           clearTimeout(timeout);
           settled = true;
           socket.close();
+          activeSocket = null;
           resolve(message.response);
         } else if (onUpdate) {
           onUpdate(adaptAdvisorResponse(message.response));
@@ -92,10 +100,14 @@
       socket.addEventListener("error", () => {
         clearTimeout(timeout);
         settled = true;
+        activeSocket = null;
         reject(new Error("WebSocket unavailable"));
       });
       socket.addEventListener("close", () => {
         clearTimeout(timeout);
+        if (activeSocket === socket) {
+          activeSocket = null;
+        }
         if (!settled) {
           settled = true;
           reject(new Error("WebSocket closed"));

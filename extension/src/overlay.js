@@ -13,6 +13,7 @@
     root.innerHTML = `
       <header class="harmonies-advisor-header">
         <strong>Harmonies Advisor</strong>
+        <button type="button" data-action="stop" title="Stop search">Stop</button>
         <button type="button" data-action="toggle" title="Collapse panel">_</button>
       </header>
       <div class="harmonies-advisor-body">
@@ -29,6 +30,9 @@
     });
 
     return {
+      onStop(callback) {
+        root.querySelector("[data-action='stop']").addEventListener("click", callback);
+      },
       setStatus(message) {
         root.querySelector(".harmonies-advisor-status").textContent = message;
       },

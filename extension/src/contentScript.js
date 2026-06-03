@@ -4,6 +4,10 @@
 
   const overlay = window.HarmoniesAdvisorOverlay.createOverlay();
   const advisorClient = window.HarmoniesAdvisorClient.createAdvisorClient();
+  overlay.onStop(() => {
+    advisorClient.stop();
+    overlay.setStatus("Stopping search");
+  });
 
   function injectPageBridge() {
     if (document.getElementById(SCRIPT_ID)) {

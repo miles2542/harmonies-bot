@@ -73,6 +73,7 @@ pub fn search_current_player_turn_with_progress(
     seed: u64,
     time_budget_ms: u64,
     started: Instant,
+    should_cancel: impl Fn() -> bool,
     mut on_progress: impl FnMut(SearchOutcome),
 ) -> SearchOutcome {
     let deadline =
@@ -103,22 +104,26 @@ pub fn search_current_player_turn_with_progress(
         progress: progress.clone(),
         warnings: warnings.clone(),
     });
-    apply_opponent_denial(
-        &mut roots,
-        snapshot,
-        player,
-        catalog,
-        weights,
-        &mut progress,
-    );
-    on_progress(SearchOutcome {
-        plans: sorted_plans(&roots, max_results),
-        progress: progress.clone(),
-        warnings: warnings.clone(),
-    });
+    if should_cancel() {
+        progress.stopped_early = true;
+    } else {
+        apply_opponent_denial(
+            &mut roots,
+            snapshot,
+            player,
+            catalog,
+            weights,
+            &mut progress,
+        );
+        on_progress(SearchOutcome {
+            plans: sorted_plans(&roots, max_results),
+            progress: progress.clone(),
+            warnings: warnings.clone(),
+        });
+    }
 
     for depth in 1..=FUTURE_DEPTH {
-        if Instant::now() >= deadline {
+        if progress.stopped_early || should_cancel() || Instant::now() >= deadline {
             progress.stopped_early = true;
             break;
         }
@@ -130,6 +135,7 @@ pub fn search_current_player_turn_with_progress(
             seed,
             depth,
             deadline,
+            &should_cancel,
             &mut progress,
         );
         if !progress.stopped_early {
@@ -204,10 +210,11 @@ fn estimate_depth(
     seed: u64,
     depth: usize,
     deadline: Instant,
+    should_cancel: &impl Fn() -> bool,
     progress: &mut SearchProgress,
 ) {
     for (index, root) in roots.iter_mut().enumerate() {
-        if Instant::now() >= deadline {
+        if should_cancel() || Instant::now() >= deadline {
             progress.stopped_early = true;
             return;
         }
@@ -219,6 +226,7 @@ fn estimate_depth(
             seed.wrapping_add(index as u64),
             depth.saturating_sub(1),
             deadline,
+            should_cancel,
             progress,
         );
         root.future_estimate = future.max(root.immediate.total());
@@ -234,6 +242,7 @@ fn future_value(
     seed: u64,
     depth_remaining: usize,
     deadline: Instant,
+    should_cancel: &impl Fn() -> bool,
     progress: &mut SearchProgress,
 ) -> i32 {
     let mut frontier = vec![initial];
@@ -241,7 +250,7 @@ fn future_value(
     for depth in 0..depth_remaining {
         let mut next = Vec::new();
         for state in frontier {
-            if should_stop(deadline) {
+            if should_stop(deadline, should_cancel) {
                 progress.stopped_early = true;
                 return best;
             }
@@ -251,6 +260,7 @@ fn future_value(
                 catalog,
                 seed.wrapping_add(depth as u64),
                 deadline,
+                should_cancel,
                 &mut next,
                 progress,
             );
@@ -272,15 +282,16 @@ fn expand_future_state(
     catalog: &CardCatalog,
     seed: u64,
     deadline: Instant,
+    should_cancel: &impl Fn() -> bool,
     output: &mut Vec<FutureState>,
     progress: &mut SearchProgress,
 ) {
-    if should_stop(deadline) {
+    if should_stop(deadline, should_cancel) {
         progress.stopped_early = true;
         return;
     }
     for (group_index, tokens) in state.central_groups.iter().enumerate() {
-        if should_stop(deadline) {
+        if should_stop(deadline, should_cancel) {
             progress.stopped_early = true;
             return;
         }
@@ -325,8 +336,8 @@ fn expand_future_state(
     }
 }
 
-fn should_stop(deadline: Instant) -> bool {
-    Instant::now() + Duration::from_millis(MIN_FUTURE_EXPAND_MS) >= deadline
+fn should_stop(deadline: Instant, should_cancel: &impl Fn() -> bool) -> bool {
+    should_cancel() || Instant::now() + Duration::from_millis(MIN_FUTURE_EXPAND_MS) >= deadline
 }
 
 fn state_after_root(
