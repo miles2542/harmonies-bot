@@ -4,12 +4,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     cards::CardCatalog,
-    model::{Color, GameSnapshotV1, PlayerState},
-    scoring::{score_player, ScoreBreakdown},
-    turn::{generate_current_turn_sequences, TurnStep},
+    model::{Color, GameSnapshotV1},
+    scoring::ScoreBreakdown,
+    search::{search_current_player_turn, SearchProgress},
+    turn::TurnStep,
 };
-
-const TURN_BEAM_WIDTH: usize = 512;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +28,7 @@ pub struct AdvisorResponseV1 {
     pub status: AdvisorStatus,
     pub elapsed_ms: u128,
     pub best_moves: Vec<MovePlanV1>,
+    pub progress: SearchProgress,
     pub warnings: Vec<String>,
 }
 
@@ -83,6 +83,7 @@ pub fn advise(request: AdvisorRequestV1) -> AdvisorResponseV1 {
             status: AdvisorStatus::NotParticipantTurn,
             elapsed_ms: started.elapsed().as_millis(),
             best_moves: Vec::new(),
+            progress: SearchProgress::default(),
             warnings,
         };
     }
@@ -98,73 +99,40 @@ pub fn advise(request: AdvisorRequestV1) -> AdvisorResponseV1 {
             status: AdvisorStatus::InvalidSnapshot,
             elapsed_ms: started.elapsed().as_millis(),
             best_moves: Vec::new(),
+            progress: SearchProgress::default(),
             warnings: vec!["perspective player missing from snapshot".into()],
         };
     };
 
-    let mut plans: Vec<MovePlanV1> = request
-        .snapshot
-        .central_token_groups
-        .iter()
-        .enumerate()
-        .filter_map(|(group_index, tokens)| {
-            greedy_place_group(&player, tokens, group_index, &request)
-        })
-        .collect();
+    let outcome = search_current_player_turn(
+        &request.snapshot,
+        &player,
+        &request.catalog,
+        request.max_results,
+        request.seed,
+        request.time_budget_ms,
+        started,
+    );
 
-    plans.sort_by(|left, right| right.score_estimate.cmp(&left.score_estimate));
-    plans.truncate(request.max_results.max(1));
-
-    if plans.is_empty() {
+    if outcome.plans.is_empty() {
         warnings.push("no legal placement found for any central group".into());
     }
+    warnings.extend(outcome.warnings);
 
     AdvisorResponseV1 {
-        status: if plans.is_empty() {
+        status: if outcome.plans.is_empty() {
             AdvisorStatus::NoLegalMove
         } else {
             AdvisorStatus::Ready
         },
         elapsed_ms: started.elapsed().as_millis(),
-        best_moves: plans,
+        best_moves: outcome.plans,
+        progress: outcome.progress,
         warnings,
     }
 }
 
-fn greedy_place_group(
-    player: &PlayerState,
-    tokens: &[Color],
-    group_index: usize,
-    request: &AdvisorRequestV1,
-) -> Option<MovePlanV1> {
-    generate_current_turn_sequences(
-        player,
-        tokens,
-        &request.snapshot.river_cards,
-        &request.catalog,
-        request.snapshot.board_side,
-        TURN_BEAM_WIDTH,
-    )
-    .into_iter()
-    .map(|turn| {
-        let mut actions = vec![MoveActionV1::TakeGroup {
-            group_index,
-            tokens: tokens.to_vec(),
-        }];
-        actions.extend(turn.steps.into_iter().map(turn_step_action));
-        let score_breakdown =
-            score_player(&turn.player, request.snapshot.board_side, &request.catalog);
-        MovePlanV1 {
-            central_group_index: group_index,
-            ordered_actions: actions,
-            score_estimate: score_breakdown.total(),
-            score_breakdown,
-        }
-    })
-    .max_by_key(|plan| plan.score_estimate)
-}
-
-fn turn_step_action(step: TurnStep) -> MoveActionV1 {
+pub(crate) fn turn_step_action(step: TurnStep) -> MoveActionV1 {
     match step {
         TurnStep::PlaceToken { token, coord } => MoveActionV1::PlaceToken {
             token,
@@ -187,7 +155,7 @@ fn turn_step_action(step: TurnStep) -> MoveActionV1 {
 
 #[cfg(test)]
 mod tests {
-    use crate::model::{BoardSide, Cell, Coord, Stack};
+    use crate::model::{BagCounts, BoardSide, Cell, Coord, PlayerState, Stack};
 
     use super::*;
 
@@ -224,6 +192,7 @@ mod tests {
             }],
             central_token_groups: vec![vec![Color::Field, Color::Field, Color::Water]],
             river_cards: Vec::new(),
+            bag_counts: BagCounts::default(),
             cards_catalog_version: "test".into(),
         };
         let response = advise(AdvisorRequestV1 {

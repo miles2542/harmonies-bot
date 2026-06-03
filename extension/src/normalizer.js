@@ -33,17 +33,20 @@
     const activePlayerId = normalizePlayerId(readActivePlayerId(gamedatas), playerIds) || perspective;
     const allCubeLocations = collectAllCubeLocations(gamedatas, playersById);
     const cardCubeCounts = countCardCubes(gamedatas.cubesOnAnimalCards);
+    const centralTokenGroups = parseCentralGroups(gamedatas.tokensOnCentralBoard);
+    const players = Object.entries(playersById).map(([playerId, player]) =>
+      normalizePlayer(playerId, player, gamedatas, hexes, allCubeLocations, cardCubeCounts, playerIds),
+    );
 
     return {
       schemaVersion: 1,
       perspectivePlayerId: perspective,
       activePlayerId,
       boardSide: parseBoardSide(gamedatas.boardSide),
-      players: Object.entries(playersById).map(([playerId, player]) =>
-        normalizePlayer(playerId, player, gamedatas, hexes, allCubeLocations, cardCubeCounts, playerIds),
-      ),
-      centralTokenGroups: parseCentralGroups(gamedatas.tokensOnCentralBoard),
+      players,
+      centralTokenGroups,
       riverCards: parseCards(gamedatas.river, new Map(), false),
+      bagCounts: inferBagCounts(players, centralTokenGroups, gamedatas.remainingTokens),
       cardsCatalogVersion: stringValue(gamedatas.version) || "bga",
     };
   }
@@ -259,6 +262,31 @@
         counts.set(cardId, (counts.get(cardId) || 0) + 1);
       }
     });
+    return counts;
+  }
+
+  function inferBagCounts(players, centralTokenGroups, remainingTokens) {
+    const counts = {
+      water: 23,
+      mountain: 23,
+      trunk: 21,
+      foliage: 19,
+      field: 19,
+      building: 15,
+      unknown: 0,
+    };
+    players
+      .flatMap((player) => player.cells)
+      .flatMap((cell) => cell.stack.tokens)
+      .concat(centralTokenGroups.flat())
+      .forEach((color) => {
+        counts[color] = Math.max(0, (counts[color] || 0) - 1);
+      });
+    const reported = numberValue(remainingTokens);
+    if (Number.isFinite(reported)) {
+      const known = counts.water + counts.mountain + counts.trunk + counts.foliage + counts.field + counts.building;
+      counts.unknown = Math.max(0, Math.trunc(reported) - known);
+    }
     return counts;
   }
 

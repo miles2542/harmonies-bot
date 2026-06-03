@@ -41,6 +41,50 @@ impl Color {
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BagCounts {
+    pub water: u16,
+    pub mountain: u16,
+    pub trunk: u16,
+    pub foliage: u16,
+    pub field: u16,
+    pub building: u16,
+    pub unknown: u16,
+}
+
+impl BagCounts {
+    pub fn get(&self, color: Color) -> u16 {
+        match color {
+            Color::Water => self.water,
+            Color::Mountain => self.mountain,
+            Color::Trunk => self.trunk,
+            Color::Foliage => self.foliage,
+            Color::Field => self.field,
+            Color::Building => self.building,
+        }
+    }
+
+    pub fn total_known(&self) -> u16 {
+        self.water + self.mountain + self.trunk + self.foliage + self.field + self.building
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.total_known() == 0 && self.unknown == 0
+    }
+
+    pub fn saturating_sub_color(&mut self, color: Color) {
+        match color {
+            Color::Water => self.water = self.water.saturating_sub(1),
+            Color::Mountain => self.mountain = self.mountain.saturating_sub(1),
+            Color::Trunk => self.trunk = self.trunk.saturating_sub(1),
+            Color::Foliage => self.foliage = self.foliage.saturating_sub(1),
+            Color::Field => self.field = self.field.saturating_sub(1),
+            Color::Building => self.building = self.building.saturating_sub(1),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Stack {
     pub tokens: Vec<Color>,
 }
@@ -96,6 +140,8 @@ pub struct GameSnapshotV1 {
     pub players: Vec<PlayerState>,
     pub central_token_groups: Vec<Vec<Color>>,
     pub river_cards: Vec<ActiveCard>,
+    #[serde(default)]
+    pub bag_counts: BagCounts,
     pub cards_catalog_version: String,
 }
 

@@ -5,7 +5,9 @@ use std::collections::{HashMap, HashSet};
 use serde_json::Value;
 use thiserror::Error;
 
-use crate::model::{ActiveCard, BoardSide, Cell, Color, Coord, GameSnapshotV1, PlayerState, Stack};
+use crate::model::{
+    ActiveCard, BagCounts, BoardSide, Cell, Color, Coord, GameSnapshotV1, PlayerState, Stack,
+};
 
 use ids::{
     bga_ids_for_player, cell_key, collect_all_cube_locations, collect_single_player_cube_coords,
@@ -47,21 +49,27 @@ pub fn normalize_gamedatas(
     let active_player_id = active_player_id(gamedatas)
         .map(|id| player_ids.get(&id).cloned().unwrap_or(id))
         .unwrap_or_else(|| perspective.clone());
-    let players = players_value
+    let players: Vec<PlayerState> = players_value
         .iter()
         .map(|(player_id, value)| {
             let bga_ids = bga_ids_for_player(player_id, value, gamedatas, &player_ids);
             normalize_player(player_id, &bga_ids, value, &hexes, &cubes, gamedatas)
         })
         .collect();
+    let central_token_groups = parse_central_groups(object.get("tokensOnCentralBoard"));
 
     Ok(GameSnapshotV1 {
         schema_version: 1,
         perspective_player_id: perspective,
         active_player_id,
         board_side: parse_board_side(object.get("boardSide")),
+        bag_counts: infer_bag_counts(
+            &players,
+            &central_token_groups,
+            object.get("remainingTokens"),
+        ),
         players,
-        central_token_groups: parse_central_groups(object.get("tokensOnCentralBoard")),
+        central_token_groups,
         river_cards: parse_cards(object.get("river"), &HashMap::new(), false),
         cards_catalog_version: object
             .get("version")
@@ -69,6 +77,53 @@ pub fn normalize_gamedatas(
             .unwrap_or("bga")
             .to_owned(),
     })
+}
+
+fn infer_bag_counts(
+    players: &[PlayerState],
+    central_token_groups: &[Vec<Color>],
+    remaining_tokens: Option<&Value>,
+) -> BagCounts {
+    let mut counts = official_token_distribution();
+    for color in players
+        .iter()
+        .flat_map(|player| &player.cells)
+        .flat_map(|cell| cell.stack.tokens.iter().copied())
+        .chain(central_token_groups.iter().flatten().copied())
+    {
+        subtract_visible_token(&mut counts, color);
+    }
+    let known_total = counts.total_known();
+    let reported_total = remaining_tokens
+        .and_then(Value::as_u64)
+        .map(|value| value.min(u16::MAX as u64) as u16);
+    counts.unknown = reported_total
+        .map(|reported| reported.saturating_sub(known_total))
+        .unwrap_or(0);
+    counts
+}
+
+fn official_token_distribution() -> BagCounts {
+    BagCounts {
+        water: 23,
+        mountain: 23,
+        trunk: 21,
+        foliage: 19,
+        field: 19,
+        building: 15,
+        unknown: 0,
+    }
+}
+
+fn subtract_visible_token(counts: &mut BagCounts, color: Color) {
+    match color {
+        Color::Water => counts.water = counts.water.saturating_sub(1),
+        Color::Mountain => counts.mountain = counts.mountain.saturating_sub(1),
+        Color::Trunk => counts.trunk = counts.trunk.saturating_sub(1),
+        Color::Foliage => counts.foliage = counts.foliage.saturating_sub(1),
+        Color::Field => counts.field = counts.field.saturating_sub(1),
+        Color::Building => counts.building = counts.building.saturating_sub(1),
+    }
 }
 
 fn normalize_player(

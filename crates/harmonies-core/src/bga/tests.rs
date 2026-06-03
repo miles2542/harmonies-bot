@@ -9,6 +9,7 @@ fn normalizes_observed_tutorial_shape() {
         "boardSide": "sideA",
         "hexes": [{"col": 0, "row": 0}, {"col": 1, "row": 0}],
         "gamestate": {"active_player": "p1"},
+        "remainingTokens": 115,
         "players": {
             "p1": {
                 "emptyHexes": 1,
@@ -40,6 +41,11 @@ fn normalizes_observed_tutorial_shape() {
         vec![Color::Mountain, Color::Water, Color::Foliage]
     );
     assert_eq!(snapshot.river_cards[0].type_arg, 22);
+    assert_eq!(snapshot.bag_counts.trunk, 20);
+    assert_eq!(snapshot.bag_counts.foliage, 17);
+    assert_eq!(snapshot.bag_counts.mountain, 22);
+    assert_eq!(snapshot.bag_counts.water, 22);
+    assert_eq!(snapshot.bag_counts.unknown, 0);
 }
 
 #[test]
