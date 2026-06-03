@@ -4,13 +4,14 @@
 
 - Project-local Rust workspace scaffold.
 - `harmonies-core` model, placement rules, card parser, pattern matcher, scoring, baseline advisor.
-- `harmonies-cli` JSON request runner.
+- Raw BGA `gameui.gamedatas` normalizer into `GameSnapshotV1`.
+- `harmonies-cli` JSON request runner plus `normalize` command.
 - Firefox extension scaffold: page bridge, content script, overlay, mock advisor.
 - Python utility scripts for snapshot anonymization and CLI benchmark.
 
 ## Known Gaps
 
-- BGA snapshot normalization from raw `gameui.gamedatas` into `GameSnapshotV1` still pending.
+- Need real active-player post-turn snapshot with non-empty `tokensOnBoard` for regression fixture.
 - Advisor uses greedy legal baseline, not beam search yet.
 - WASM/native runtime gate pending.
 - Extension uses mock advisor until Rust/WASM bridge exists.
