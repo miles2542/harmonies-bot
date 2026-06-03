@@ -112,13 +112,13 @@
       bestMove: best
         ? {
             centralGroupId: String(best.centralGroupIndex + 1),
-            title: `Take group ${best.centralGroupIndex + 1}; estimate ${best.scoreEstimate} VP`,
+            title: `Take group ${best.centralGroupIndex + 1}; utility ${best.utilityEstimate ?? best.scoreEstimate}`,
             steps: actionSteps(best).concat(scoreSteps(best)),
           }
         : null,
       alternatives: (response.bestMoves || []).slice(1).map((move) => ({
         centralGroupId: String(move.centralGroupIndex + 1),
-        label: `Group ${move.centralGroupIndex + 1}: ${move.scoreEstimate} VP`,
+        label: `Group ${move.centralGroupIndex + 1}: utility ${move.utilityEstimate ?? move.scoreEstimate}`,
       })),
     };
   }
@@ -152,6 +152,9 @@
   function scoreSteps(move) {
     const breakdown = move.scoreBreakdown || {};
     return [
+      `Estimates: self ${move.scoreEstimate || 0} VP, denial ${move.opponentDenialEstimate || 0}, utility ${
+        move.utilityEstimate || move.scoreEstimate || 0
+      }`,
       `Score: trees ${breakdown.trees || 0}, mountains ${breakdown.mountains || 0}, fields ${
         breakdown.fields || 0
       }, buildings ${breakdown.buildings || 0}, water ${breakdown.water || 0}, animals ${

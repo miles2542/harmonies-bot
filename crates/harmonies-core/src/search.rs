@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 mod deck;
+mod denial;
 mod refill;
 
 use serde::{Deserialize, Serialize};
@@ -14,6 +15,7 @@ use crate::{
 };
 
 use deck::{initial_unseen_standard_cards, river_after_turn_with_refills};
+use denial::{apply_opponent_denial, utility_estimate};
 use refill::candidate_refills;
 
 const ROOT_TURN_BEAM_WIDTH: usize = 512;
@@ -47,6 +49,8 @@ struct RootCandidate {
     turn: TurnSequence,
     immediate: ScoreBreakdown,
     future_estimate: i32,
+    utility_estimate: i32,
+    opponent_denial_estimate: i32,
 }
 
 #[derive(Clone)]
@@ -118,6 +122,12 @@ pub fn search_current_player_turn_with_progress(
         progress: progress.clone(),
         warnings: warnings.clone(),
     });
+    apply_opponent_denial(&mut roots, snapshot, player, catalog, &mut progress);
+    on_progress(SearchOutcome {
+        plans: sorted_plans(&roots, max_results),
+        progress: progress.clone(),
+        warnings: warnings.clone(),
+    });
 
     for depth in 1..=FUTURE_DEPTH {
         if Instant::now() >= deadline {
@@ -147,7 +157,12 @@ pub fn search_current_player_turn_with_progress(
 
 fn sorted_plans(roots: &[RootCandidate], max_results: usize) -> Vec<MovePlanV1> {
     let mut roots = roots.to_vec();
-    roots.sort_by(|left, right| right.future_estimate.cmp(&left.future_estimate));
+    roots.sort_by(|left, right| {
+        right
+            .utility_estimate
+            .cmp(&left.utility_estimate)
+            .then_with(|| right.future_estimate.cmp(&left.future_estimate))
+    });
     roots
         .into_iter()
         .take(max_results.max(1))
@@ -176,13 +191,16 @@ fn root_candidates(
             continue;
         };
         let immediate = score_player(&best_turn.player, snapshot.board_side, catalog);
+        let future_estimate = immediate.total();
         progress.nodes_evaluated += 1;
         roots.push(RootCandidate {
             group_index,
             tokens: tokens.clone(),
             turn: best_turn,
-            future_estimate: immediate.total(),
             immediate,
+            future_estimate,
+            utility_estimate: future_estimate,
+            opponent_denial_estimate: 0,
         });
     }
     roots
@@ -213,6 +231,8 @@ fn estimate_depth(
             progress,
         );
         root.future_estimate = future.max(root.immediate.total());
+        root.utility_estimate =
+            utility_estimate(root.future_estimate, root.opponent_denial_estimate);
     }
 }
 
@@ -371,6 +391,8 @@ fn root_plan(root: RootCandidate) -> MovePlanV1 {
         central_group_index: root.group_index,
         ordered_actions: actions,
         score_estimate: root.future_estimate,
+        utility_estimate: root.utility_estimate,
+        opponent_denial_estimate: root.opponent_denial_estimate,
         score_breakdown: root.immediate,
     }
 }

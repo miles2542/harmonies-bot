@@ -47,6 +47,8 @@ pub struct MovePlanV1 {
     pub central_group_index: usize,
     pub ordered_actions: Vec<MoveActionV1>,
     pub score_estimate: i32,
+    pub utility_estimate: i32,
+    pub opponent_denial_estimate: i32,
     pub score_breakdown: ScoreBreakdown,
 }
 

@@ -20,6 +20,7 @@
 - Future search now refills drafted river slots by sampling unseen standard animal cards from catalog minus visible river/player cards.
 - Optimization target clarified: 2-player Side A with Nature Spirit enabled. Side B/3-4p remain correctness-compatible bonuses, not search-performance priorities.
 - `harmonies-cli score` and `tools.score_qa` added for scorer-vs-BGA final score parity checks.
+- Advisor now computes a cheap visible-opponent denial estimate per central token group and ranks by utility.
 
 ## Known Gaps
 
@@ -28,7 +29,7 @@
 - Need Side A 2p final-score parity fixture before training/tuning.
 - Advisor now supports interleaved place/draft/settle ordering with bounded frontier search.
 - Future search does not know exact hidden animal-card deck order; river replacements are sampled from unseen standard cards.
-- Future search does not model opponent turns yet beyond central-board availability; denial/hate-draft heuristic still pending.
+- Opponent handling is v1 heuristic only: visible current-board value for central token groups, not full opponent future search.
 - WASM runtime gate pending; native service path exists.
 - Extension uses native service when running, streaming WebSocket first; mock fallback otherwise.
 - Real BGA DOM selectors for token group highlights need snapshot/manual validation.
