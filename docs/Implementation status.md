@@ -10,12 +10,14 @@
 - Python utility scripts for snapshot anonymization and CLI benchmark.
 - Snapshot QA utility and capture checklist for raw/normalized fixture validation.
 - Real Side B near-end snapshot validated locally: raw/normalized counts match.
+- Current-turn advisor benchmarks under 30s first-answer target on rich Side B local fixture.
 
 ## Known Gaps
 
 - Need committed anonymized fixture corpus, not just ignored local `temp/` captures.
 - Need fixture set listed in [Snapshot QA](./Snapshot%20QA.md).
 - Advisor evaluates legal current-turn branches with draft + settlement, but not multi-turn stochastic beam search yet.
+- Advisor now supports interleaved place/draft/settle ordering with bounded frontier search.
 - WASM/native runtime gate pending.
 - Extension uses mock advisor until Rust/WASM bridge exists.
 - Real BGA DOM selectors for token group highlights need snapshot/manual validation.

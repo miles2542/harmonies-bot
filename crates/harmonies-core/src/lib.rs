@@ -6,6 +6,7 @@ pub mod model;
 pub mod moves;
 pub mod rules;
 pub mod scoring;
+pub mod turn;
 
 pub use advisor::{advise, AdvisorRequestV1, AdvisorResponseV1, MovePlanV1};
 pub use cards::{CardCatalog, CardPatternStep};
