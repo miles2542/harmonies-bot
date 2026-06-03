@@ -1,11 +1,7 @@
-use std::{
-    collections::HashSet,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
+mod deck;
 mod refill;
-#[cfg(test)]
-mod tests;
 
 use serde::{Deserialize, Serialize};
 
@@ -14,9 +10,10 @@ use crate::{
     cards::CardCatalog,
     model::{ActiveCard, BagCounts, BoardSide, Color, GameSnapshotV1, PlayerState},
     scoring::{score_player, ScoreBreakdown},
-    turn::{generate_current_turn_sequences, TurnSequence, TurnStep},
+    turn::{generate_current_turn_sequences, TurnSequence},
 };
 
+use deck::{initial_unseen_standard_cards, river_after_turn_with_refills};
 use refill::candidate_refills;
 
 const ROOT_TURN_BEAM_WIDTH: usize = 512;
@@ -24,6 +21,7 @@ const FUTURE_TURN_BEAM_WIDTH: usize = 50;
 const FUTURE_BRANCH_WIDTH: usize = 50;
 const FUTURE_DEPTH: usize = 3;
 const REFILL_SAMPLES: usize = 10;
+const CARD_REFILL_SAMPLES: usize = 4;
 const HARD_STOP_MARGIN_MS: u64 = 6_000;
 const MIN_FUTURE_EXPAND_MS: u64 = 7_000;
 
@@ -56,6 +54,7 @@ struct FutureState {
     player: PlayerState,
     central_groups: Vec<Vec<Color>>,
     river_cards: Vec<ActiveCard>,
+    unseen_cards: Vec<u8>,
     bag_counts: BagCounts,
     score: i32,
 }
@@ -112,7 +111,7 @@ pub fn search_current_player_turn_with_progress(
         warnings.push("bag color counts inferred with unknown remainder".into());
     }
     if !snapshot.river_cards.is_empty() {
-        warnings.push("future card river refill not modeled yet".into());
+        warnings.push("future card river refill sampled from unseen standard cards".into());
     }
     on_progress(SearchOutcome {
         plans: sorted_plans(&roots, max_results),
@@ -203,7 +202,7 @@ fn estimate_depth(
             progress.stopped_early = true;
             return;
         }
-        let state = state_after_root(root, snapshot);
+        let state = state_after_root(root, snapshot, catalog, seed.wrapping_add(index as u64));
         let future = future_value(
             state,
             snapshot.board_side,
@@ -291,16 +290,25 @@ fn expand_future_state(
                     .iter()
                     .copied()
                     .for_each(|color| bag_counts.saturating_sub_color(color));
-                let river_cards = river_after_turn(&state.river_cards, &turn);
-                let score = score_player(&turn.player, board_side, catalog).total();
-                progress.nodes_evaluated += 1;
-                output.push(FutureState {
-                    player: turn.player.clone(),
-                    central_groups,
-                    river_cards,
-                    bag_counts,
-                    score,
-                });
+                for (river_cards, unseen_cards) in river_after_turn_with_refills(
+                    &state.river_cards,
+                    &turn,
+                    &state.unseen_cards,
+                    catalog,
+                    seed,
+                    CARD_REFILL_SAMPLES,
+                ) {
+                    let score = score_player(&turn.player, board_side, catalog).total();
+                    progress.nodes_evaluated += 1;
+                    output.push(FutureState {
+                        player: turn.player.clone(),
+                        central_groups: central_groups.clone(),
+                        river_cards,
+                        unseen_cards,
+                        bag_counts: bag_counts.clone(),
+                        score,
+                    });
+                }
             }
         }
     }
@@ -310,7 +318,12 @@ fn should_stop(deadline: Instant) -> bool {
     Instant::now() + Duration::from_millis(MIN_FUTURE_EXPAND_MS) >= deadline
 }
 
-fn state_after_root(root: &RootCandidate, snapshot: &GameSnapshotV1) -> FutureState {
+fn state_after_root(
+    root: &RootCandidate,
+    snapshot: &GameSnapshotV1,
+    catalog: &CardCatalog,
+    seed: u64,
+) -> FutureState {
     let mut central_groups = snapshot.central_token_groups.clone();
     let refill = candidate_refills(
         &snapshot.bag_counts,
@@ -326,29 +339,26 @@ fn state_after_root(root: &RootCandidate, snapshot: &GameSnapshotV1) -> FutureSt
         .iter()
         .copied()
         .for_each(|color| bag_counts.saturating_sub_color(color));
+    let unseen_cards = initial_unseen_standard_cards(snapshot, catalog);
+    let river_branch = river_after_turn_with_refills(
+        &snapshot.river_cards,
+        &root.turn,
+        &unseen_cards,
+        catalog,
+        seed,
+        CARD_REFILL_SAMPLES,
+    )
+    .into_iter()
+    .next()
+    .unwrap_or_else(|| (snapshot.river_cards.clone(), unseen_cards));
     FutureState {
         player: root.turn.player.clone(),
         central_groups,
-        river_cards: river_after_turn(&snapshot.river_cards, &root.turn),
+        river_cards: river_branch.0,
+        unseen_cards: river_branch.1,
         bag_counts,
         score: root.immediate.total(),
     }
-}
-
-fn river_after_turn(river: &[ActiveCard], turn: &TurnSequence) -> Vec<ActiveCard> {
-    let drafted: HashSet<u32> = turn
-        .steps
-        .iter()
-        .filter_map(|step| match step {
-            TurnStep::DraftCard { card_id, .. } => Some(*card_id),
-            _ => None,
-        })
-        .collect();
-    river
-        .iter()
-        .filter(|card| !drafted.contains(&card.card_id))
-        .cloned()
-        .collect()
 }
 
 fn root_plan(root: RootCandidate) -> MovePlanV1 {

@@ -17,13 +17,15 @@
 - `harmonies-service` native localhost service exposes `/health`, `/advise`, and `/ws`.
 - Firefox extension streams `/ws` progress from local Rust service, with HTTP/mock fallback.
 - Rich Side B WebSocket smoke: first streamed response ~8s, final 30s-budget response ~17.5s.
+- Future search now refills drafted river slots by sampling unseen standard animal cards from catalog minus visible river/player cards.
+- Optimization target clarified: 2-player Side A with Nature Spirit enabled. Side B/3-4p remain correctness-compatible bonuses, not search-performance priorities.
 
 ## Known Gaps
 
 - Need committed anonymized fixture corpus, not just ignored local `temp/` captures.
 - Need fixture set listed in [Snapshot QA](./Snapshot%20QA.md).
 - Advisor now supports interleaved place/draft/settle ordering with bounded frontier search.
-- Future search does not model animal-card deck/river refill yet; drafted cards are removed from visible river, unknown replacement is omitted.
+- Future search does not know exact hidden animal-card deck order; river replacements are sampled from unseen standard cards.
 - Future search does not model opponent turns yet beyond central-board availability; denial/hate-draft heuristic still pending.
 - WASM runtime gate pending; native service path exists.
 - Extension uses native service when running, streaming WebSocket first; mock fallback otherwise.
