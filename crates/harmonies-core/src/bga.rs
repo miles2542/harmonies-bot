@@ -25,20 +25,27 @@ pub fn normalize_gamedatas(
         .and_then(Value::as_object)
         .ok_or(BgaNormalizeError::MissingPlayers)?;
     let hexes = parse_hexes(object.get("hexes")).ok_or(BgaNormalizeError::MissingHexes)?;
-    let cubes = collect_cube_locations(object.get("cubesOnAnimalCards"));
+    let cubes = collect_all_cube_locations(gamedatas);
+    let player_ids = map_player_ids(gamedatas);
 
     let perspective = perspective_player_id
         .map(str::to_owned)
         .or_else(|| string_field(gamedatas, "player_id"))
         .or_else(|| string_field(gamedatas, "current_player_id"))
         .or_else(|| active_player_id(gamedatas))
+        .map(|id| player_ids.get(&id).cloned().unwrap_or(id))
         .filter(|id| players_value.contains_key(id))
         .unwrap_or_else(|| players_value.keys().next().cloned().unwrap_or_default());
 
-    let active_player_id = active_player_id(gamedatas).unwrap_or_else(|| perspective.clone());
+    let active_player_id = active_player_id(gamedatas)
+        .map(|id| player_ids.get(&id).cloned().unwrap_or(id))
+        .unwrap_or_else(|| perspective.clone());
     let players = players_value
         .iter()
-        .map(|(player_id, value)| normalize_player(player_id, value, &hexes, &cubes, gamedatas))
+        .map(|(player_id, value)| {
+            let bga_ids = bga_ids_for_player(player_id, value, gamedatas, &player_ids);
+            normalize_player(player_id, &bga_ids, value, &hexes, &cubes, gamedatas)
+        })
         .collect();
 
     Ok(GameSnapshotV1 {
@@ -59,6 +66,7 @@ pub fn normalize_gamedatas(
 
 fn normalize_player(
     player_id: &str,
+    bga_ids: &[String],
     value: &Value,
     hexes: &[Coord],
     cubes: &HashSet<String>,
@@ -66,17 +74,28 @@ fn normalize_player(
 ) -> PlayerState {
     let card_cube_counts = count_card_cubes(gamedatas.get("cubesOnAnimalCards"));
     let token_stacks = parse_tokens_on_board(value.get("tokensOnBoard"));
+    let mut player_cubes = cubes.clone();
+    collect_single_player_cube_locations(value, &mut player_cubes);
+    let player_cube_coords = collect_single_player_cube_coords(value);
     let cells = hexes
         .iter()
         .copied()
         .map(|coord| {
-            let key = cell_key(player_id, coord);
+            let key = bga_ids
+                .iter()
+                .map(|id| cell_key(id, coord))
+                .find(|key| token_stacks.contains_key(key) || player_cubes.contains(key));
             Cell {
                 coord,
                 stack: Stack {
-                    tokens: token_stacks.get(&key).cloned().unwrap_or_default(),
+                    tokens: key
+                        .as_ref()
+                        .and_then(|key| token_stacks.get(key))
+                        .cloned()
+                        .unwrap_or_default(),
                 },
-                locked_by_cube: cubes.contains(&key),
+                locked_by_cube: key.map(|key| player_cubes.contains(&key)).unwrap_or(false)
+                    || player_cube_coords.contains(&coord),
             }
         })
         .collect();
@@ -99,6 +118,91 @@ fn normalize_player(
             .unwrap_or(0)
             .min(u8::MAX as u64) as u8,
     }
+}
+
+fn map_player_ids(gamedatas: &Value) -> HashMap<String, String> {
+    let mut ids = HashMap::new();
+    let Some(players) = gamedatas.get("players").and_then(Value::as_object) else {
+        return ids;
+    };
+    for (key, player) in players {
+        ids.insert(key.clone(), key.clone());
+        if let Some(id) = string_field(player, "id") {
+            ids.insert(id, key.clone());
+        }
+        if let Some(order_id) = player_order_id_for_player(gamedatas, player) {
+            ids.insert(order_id, key.clone());
+        }
+        for inferred in infer_player_ids_from_locations(player) {
+            ids.insert(inferred, key.clone());
+        }
+    }
+    ids
+}
+
+fn bga_ids_for_player(
+    player_id: &str,
+    player: &Value,
+    gamedatas: &Value,
+    mapped_ids: &HashMap<String, String>,
+) -> Vec<String> {
+    let mut ids = vec![player_id.to_owned()];
+    if let Some(id) = string_field(player, "id") {
+        ids.push(id);
+    }
+    if let Some(order_id) = player_order_id_for_player(gamedatas, player) {
+        ids.push(order_id);
+    }
+    ids.extend(infer_player_ids_from_locations(player));
+    ids.extend(
+        mapped_ids
+            .iter()
+            .filter(|(_, mapped)| mapped.as_str() == player_id)
+            .map(|(raw, _)| raw.clone()),
+    );
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
+fn player_order_id_for_player(gamedatas: &Value, player: &Value) -> Option<String> {
+    let player_no = player.get("playerNo")?.as_u64()? as usize;
+    if player_no == 0 {
+        return None;
+    }
+    gamedatas
+        .get("playerorder")
+        .and_then(Value::as_array)
+        .and_then(|order| order.get(player_no - 1))
+        .and_then(|value| {
+            value
+                .as_str()
+                .map(str::to_owned)
+                .or_else(|| value.as_u64().map(|id| id.to_string()))
+        })
+}
+
+fn infer_player_ids_from_locations(player: &Value) -> Vec<String> {
+    let mut ids = Vec::new();
+    if let Some(tokens) = player.get("tokensOnBoard").and_then(Value::as_object) {
+        ids.extend(tokens.keys().filter_map(|key| cell_key_player_id(key)));
+    }
+    for field in ["boardAnimalCards", "doneAnimalCards"] {
+        for card in player
+            .get(field)
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if let Some(location) = card.get("location").and_then(Value::as_str) {
+                ids.extend(location.strip_prefix("board").map(str::to_owned));
+                ids.extend(location.strip_prefix("done").map(str::to_owned));
+            }
+        }
+    }
+    ids.sort();
+    ids.dedup();
+    ids
 }
 
 fn parse_hexes(value: Option<&Value>) -> Option<Vec<Coord>> {
@@ -274,6 +378,46 @@ fn collect_cube_locations(value: Option<&Value>) -> HashSet<String> {
         .collect()
 }
 
+fn collect_all_cube_locations(gamedatas: &Value) -> HashSet<String> {
+    let mut locations = collect_cube_locations(gamedatas.get("cubesOnAnimalCards"));
+    collect_player_cube_locations(gamedatas, &mut locations);
+    locations
+}
+
+fn collect_player_cube_locations(gamedatas: &Value, locations: &mut HashSet<String>) {
+    for player in gamedatas
+        .get("players")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flat_map(|players| players.values())
+    {
+        collect_single_player_cube_locations(player, locations);
+    }
+}
+
+fn collect_single_player_cube_locations(player: &Value, locations: &mut HashSet<String>) {
+    match player.get("animalCubesOnBoard") {
+        Some(Value::Array(items)) => {
+            for location in items.iter().filter_map(Value::as_str) {
+                locations.insert(location.to_owned());
+            }
+        }
+        Some(Value::Object(items)) => {
+            locations.extend(items.keys().cloned());
+        }
+        _ => {}
+    }
+}
+
+fn collect_single_player_cube_coords(player: &Value) -> HashSet<Coord> {
+    let mut locations = HashSet::new();
+    collect_single_player_cube_locations(player, &mut locations);
+    locations
+        .into_iter()
+        .filter_map(|location| cell_key_coord(&location))
+        .collect()
+}
+
 fn token_color(token: &Value) -> Option<Color> {
     token
         .get("type_arg")
@@ -307,6 +451,22 @@ fn value_matches_id(value: &Value, player_id: &str) -> bool {
 
 fn cell_key(player_id: &str, coord: Coord) -> String {
     format!("cell_{player_id}_{}_{}", coord.col, coord.row)
+}
+
+fn cell_key_player_id(key: &str) -> Option<String> {
+    let rest = key.strip_prefix("cell_")?;
+    let mut parts = rest.rsplitn(3, '_');
+    parts.next()?.parse::<i8>().ok()?;
+    parts.next()?.parse::<i8>().ok()?;
+    Some(parts.next()?.to_owned())
+}
+
+fn cell_key_coord(key: &str) -> Option<Coord> {
+    let rest = key.strip_prefix("cell_")?;
+    let mut parts = rest.rsplitn(3, '_');
+    let row = parts.next()?.parse::<i8>().ok()?;
+    let col = parts.next()?.parse::<i8>().ok()?;
+    Some(Coord { col, row })
 }
 
 #[cfg(test)]
@@ -353,5 +513,119 @@ mod tests {
             vec![Color::Mountain, Color::Water, Color::Foliage]
         );
         assert_eq!(snapshot.river_cards[0].type_arg, 22);
+    }
+
+    #[test]
+    fn maps_anonymized_player_key_to_numeric_cell_prefix() {
+        let raw = json!({
+            "version": "230603",
+            "boardSide": "sideB",
+            "hexes": [{"col": 2, "row": 2}],
+            "playerorder": [97479253],
+            "gamestate": {"active_player": 97479253},
+            "players": {
+                "player_1": {
+                    "id": "player_1",
+                    "playerNo": 1,
+                    "emptyHexes": 0,
+                    "tokensOnBoard": {
+                        "cell_97479253_2_2": [
+                            {"location_arg": 2, "type_arg": 4},
+                            {"location_arg": 1, "type_arg": 3}
+                        ]
+                    },
+                    "boardAnimalCards": [],
+                    "doneAnimalCards": []
+                }
+            },
+            "tokensOnCentralBoard": {},
+            "river": [],
+            "spiritsCards": [],
+            "cubesOnAnimalCards": []
+        });
+        let snapshot = normalize_gamedatas(&raw, None).unwrap();
+        assert_eq!(snapshot.active_player_id, "player_1");
+        assert_eq!(
+            snapshot.players[0].cells[0].stack.tokens,
+            vec![Color::Trunk, Color::Foliage]
+        );
+    }
+
+    #[test]
+    fn locks_cells_from_player_animal_cubes_on_board() {
+        let raw = json!({
+            "version": "230603",
+            "boardSide": "sideB",
+            "hexes": [{"col": 1, "row": 0}],
+            "playerorder": [97479253],
+            "gamestate": {"active_player": 97479253},
+            "players": {
+                "player_1": {
+                    "id": "player_1",
+                    "playerNo": 1,
+                    "emptyHexes": 0,
+                    "animalCubesOnBoard": ["cell_97479253_1_0"],
+                    "tokensOnBoard": {
+                        "cell_97479253_1_0": [
+                            {"location_arg": 1, "type_arg": 5}
+                        ]
+                    },
+                    "boardAnimalCards": [],
+                    "doneAnimalCards": []
+                }
+            },
+            "tokensOnCentralBoard": {},
+            "river": [],
+            "spiritsCards": [],
+            "cubesOnAnimalCards": []
+        });
+        let snapshot = normalize_gamedatas(&raw, None).unwrap();
+        assert!(snapshot.players[0].cells[0].locked_by_cube);
+    }
+
+    #[test]
+    fn locks_cells_when_player_no_maps_second_order_entry() {
+        let raw = json!({
+            "version": "230603",
+            "boardSide": "sideB",
+            "hexes": [{"col": 1, "row": 0}],
+            "playerorder": [98885479, 97479253],
+            "gamestate": {"active_player": 98885479},
+            "players": {
+                "player_1": {
+                    "id": "player_1",
+                    "playerNo": 2,
+                    "emptyHexes": 0,
+                    "animalCubesOnBoard": ["cell_97479253_1_0"],
+                    "tokensOnBoard": {
+                        "cell_97479253_1_0": [
+                            {"location_arg": 1, "type_arg": 5}
+                        ]
+                    },
+                    "boardAnimalCards": [],
+                    "doneAnimalCards": []
+                },
+                "player_2": {
+                    "id": "player_2",
+                    "playerNo": 1,
+                    "emptyHexes": 0,
+                    "animalCubesOnBoard": [],
+                    "tokensOnBoard": {},
+                    "boardAnimalCards": [],
+                    "doneAnimalCards": []
+                }
+            },
+            "tokensOnCentralBoard": {},
+            "river": [],
+            "spiritsCards": [],
+            "cubesOnAnimalCards": []
+        });
+        let snapshot = normalize_gamedatas(&raw, None).unwrap();
+        let player = snapshot
+            .players
+            .iter()
+            .find(|player| player.player_id == "player_1")
+            .unwrap();
+        assert!(player.cells[0].locked_by_cube);
     }
 }
