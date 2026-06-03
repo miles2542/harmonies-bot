@@ -4,6 +4,6 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "check": "node --check src/overlay.js && node --check src/mockAdvisor.js && node --check src/advisorClient.js && node --check src/contentScript.js && node --check src/pageBridge.js"
+    "check": "node --check src/overlay.js && node --check src/normalizer.js && node --check src/mockAdvisor.js && node --check src/advisorClient.js && node --check src/contentScript.js && node --check src/pageBridge.js"
   }
 }

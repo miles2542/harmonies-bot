@@ -1,24 +1,23 @@
 (function harmoniesMockAdvisorModule() {
-  const COLOR_NAMES = {
-    1: "Water",
-    2: "Mountain",
-    3: "Trunk",
-    4: "Foliage",
-    5: "Field",
-    6: "Building",
-    7: "Building",
+  const COLOR_LABELS = {
+    water: "Water",
+    mountain: "Mountain",
+    trunk: "Trunk",
+    foliage: "Foliage",
+    field: "Field",
+    building: "Building",
   };
 
-  function normalizeCentralGroups(gamedatas) {
-    const source = gamedatas?.tokensOnCentralBoard || {};
-    return Object.entries(source).map(([groupId, tokens]) => ({
-      groupId,
-      tokens: Array.isArray(tokens) ? tokens.map((token) => COLOR_NAMES[token.type_arg] || "Unknown") : [],
+  function normalizeCentralGroups(snapshot) {
+    const groups = snapshot?.centralTokenGroups || [];
+    return groups.map((tokens, index) => ({
+      groupId: String(index + 1),
+      tokens: Array.isArray(tokens) ? tokens.map(labelColor) : [],
     }));
   }
 
-  function recommend(gamedatas) {
-    const groups = normalizeCentralGroups(gamedatas);
+  function recommend(snapshot) {
+    const groups = normalizeCentralGroups(snapshot);
     const chosen = groups.find((group) => group.tokens.length > 0);
     if (!chosen) {
       return {
@@ -35,8 +34,10 @@
         title: `Take group ${chosen.groupId}`,
         steps: [
           `Take: ${chosen.tokens.join(", ")}`,
+          `Perspective: ${snapshot.perspectivePlayerId}`,
+          `Active player: ${snapshot.activePlayerId}`,
           "Rust engine not connected yet",
-          "Use as extractor/overlay smoke test",
+          "Snapshot normalized in extension",
         ],
       },
       alternatives: groups.slice(0, 3).map((group) => ({
@@ -44,6 +45,10 @@
         label: `Group ${group.groupId}: ${group.tokens.join(", ")}`,
       })),
     };
+  }
+
+  function labelColor(color) {
+    return COLOR_LABELS[color] || "Unknown";
   }
 
   window.HarmoniesMockAdvisor = { recommend };

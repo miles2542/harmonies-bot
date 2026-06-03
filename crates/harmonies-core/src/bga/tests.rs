@@ -1,0 +1,157 @@
+use serde_json::json;
+
+use super::*;
+
+#[test]
+fn normalizes_observed_tutorial_shape() {
+    let raw = json!({
+        "version": "230603",
+        "boardSide": "sideA",
+        "hexes": [{"col": 0, "row": 0}, {"col": 1, "row": 0}],
+        "gamestate": {"active_player": "p1"},
+        "players": {
+            "p1": {
+                "emptyHexes": 1,
+                "tokensOnBoard": {
+                    "cell_p1_0_0": [
+                        {"location_arg": 1, "type_arg": 3},
+                        {"location_arg": 2, "type_arg": 4}
+                    ]
+                },
+                "boardAnimalCards": [],
+                "doneAnimalCards": []
+            }
+        },
+        "tokensOnCentralBoard": {
+            "1": [{"type_arg": 2}, {"type_arg": 1}, {"type_arg": 4}]
+        },
+        "river": [{"id": 8, "type_arg": 22, "pointLocations": [3, 6, 10, 15], "isSpirit": false}],
+        "spiritsCards": [],
+        "cubesOnAnimalCards": []
+    });
+    let snapshot = normalize_gamedatas(&raw, Some("p1")).unwrap();
+    assert_eq!(snapshot.board_side, BoardSide::SideA);
+    assert_eq!(
+        snapshot.players[0].cells[0].stack.tokens,
+        vec![Color::Trunk, Color::Foliage]
+    );
+    assert_eq!(
+        snapshot.central_token_groups[0],
+        vec![Color::Mountain, Color::Water, Color::Foliage]
+    );
+    assert_eq!(snapshot.river_cards[0].type_arg, 22);
+}
+
+#[test]
+fn maps_anonymized_player_key_to_numeric_cell_prefix() {
+    let raw = json!({
+        "version": "230603",
+        "boardSide": "sideB",
+        "hexes": [{"col": 2, "row": 2}],
+        "playerorder": [97479253],
+        "gamestate": {"active_player": 97479253},
+        "players": {
+            "player_1": {
+                "id": "player_1",
+                "playerNo": 1,
+                "emptyHexes": 0,
+                "tokensOnBoard": {
+                    "cell_97479253_2_2": [
+                        {"location_arg": 2, "type_arg": 4},
+                        {"location_arg": 1, "type_arg": 3}
+                    ]
+                },
+                "boardAnimalCards": [],
+                "doneAnimalCards": []
+            }
+        },
+        "tokensOnCentralBoard": {},
+        "river": [],
+        "spiritsCards": [],
+        "cubesOnAnimalCards": []
+    });
+    let snapshot = normalize_gamedatas(&raw, None).unwrap();
+    assert_eq!(snapshot.active_player_id, "player_1");
+    assert_eq!(
+        snapshot.players[0].cells[0].stack.tokens,
+        vec![Color::Trunk, Color::Foliage]
+    );
+}
+
+#[test]
+fn locks_cells_from_player_animal_cubes_on_board() {
+    let raw = json!({
+        "version": "230603",
+        "boardSide": "sideB",
+        "hexes": [{"col": 1, "row": 0}],
+        "playerorder": [97479253],
+        "gamestate": {"active_player": 97479253},
+        "players": {
+            "player_1": {
+                "id": "player_1",
+                "playerNo": 1,
+                "emptyHexes": 0,
+                "animalCubesOnBoard": ["cell_97479253_1_0"],
+                "tokensOnBoard": {
+                    "cell_97479253_1_0": [
+                        {"location_arg": 1, "type_arg": 5}
+                    ]
+                },
+                "boardAnimalCards": [],
+                "doneAnimalCards": []
+            }
+        },
+        "tokensOnCentralBoard": {},
+        "river": [],
+        "spiritsCards": [],
+        "cubesOnAnimalCards": []
+    });
+    let snapshot = normalize_gamedatas(&raw, None).unwrap();
+    assert!(snapshot.players[0].cells[0].locked_by_cube);
+}
+
+#[test]
+fn locks_cells_when_player_no_maps_second_order_entry() {
+    let raw = json!({
+        "version": "230603",
+        "boardSide": "sideB",
+        "hexes": [{"col": 1, "row": 0}],
+        "playerorder": [98885479, 97479253],
+        "gamestate": {"active_player": 98885479},
+        "players": {
+            "player_1": {
+                "id": "player_1",
+                "playerNo": 2,
+                "emptyHexes": 0,
+                "animalCubesOnBoard": ["cell_97479253_1_0"],
+                "tokensOnBoard": {
+                    "cell_97479253_1_0": [
+                        {"location_arg": 1, "type_arg": 5}
+                    ]
+                },
+                "boardAnimalCards": [],
+                "doneAnimalCards": []
+            },
+            "player_2": {
+                "id": "player_2",
+                "playerNo": 1,
+                "emptyHexes": 0,
+                "animalCubesOnBoard": [],
+                "tokensOnBoard": {},
+                "boardAnimalCards": [],
+                "doneAnimalCards": []
+            }
+        },
+        "tokensOnCentralBoard": {},
+        "river": [],
+        "spiritsCards": [],
+        "cubesOnAnimalCards": []
+    });
+    let snapshot = normalize_gamedatas(&raw, None).unwrap();
+    let player = snapshot
+        .players
+        .iter()
+        .find(|player| player.player_id == "player_1")
+        .unwrap();
+    assert!(player.cells[0].locked_by_cube);
+}

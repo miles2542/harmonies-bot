@@ -4,10 +4,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     cards::CardCatalog,
-    model::{Color, GameSnapshotV1, PlayerState},
-    rules::place_token,
+    model::{BoardSide, Color, GameSnapshotV1, PlayerState},
+    moves::{generate_placement_sequences, generate_settlement_sequences},
     scoring::{score_player, ScoreBreakdown},
 };
+
+const PLACEMENT_BEAM_WIDTH: usize = 250;
+const PRE_SETTLEMENT_BEAM_WIDTH: usize = 16;
+const POST_SETTLEMENT_BEAM_WIDTH: usize = 64;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -59,6 +63,16 @@ pub enum MoveActionV1 {
         token: Color,
         col: i8,
         row: i8,
+    },
+    SettleCard {
+        card_id: u32,
+        type_arg: u8,
+        col: i8,
+        row: i8,
+    },
+    DraftCard {
+        card_id: u32,
+        type_arg: u8,
     },
 }
 
@@ -125,54 +139,151 @@ fn greedy_place_group(
     group_index: usize,
     request: &AdvisorRequestV1,
 ) -> Option<MovePlanV1> {
-    let mut next_player = player.clone();
-    let mut actions = vec![MoveActionV1::TakeGroup {
-        group_index,
-        tokens: tokens.to_vec(),
-    }];
-
-    for token in tokens {
-        let Some((cell_index, score)) = best_cell_for_token(&next_player, *token, request) else {
-            return None;
-        };
-        let coord = next_player.cells[cell_index].coord;
-        place_token(&mut next_player.cells[cell_index], *token).ok()?;
-        actions.push(MoveActionV1::PlaceToken {
-            token: *token,
-            col: coord.col,
-            row: coord.row,
-        });
-        if score == i32::MIN {
-            return None;
-        }
-    }
-
-    let score_breakdown = score_player(&next_player, request.snapshot.board_side, &request.catalog);
-    Some(MovePlanV1 {
-        central_group_index: group_index,
-        ordered_actions: actions,
-        score_estimate: score_breakdown.total(),
-        score_breakdown,
-    })
+    ranked_settlement_sequences(player, request, PRE_SETTLEMENT_BEAM_WIDTH)
+        .into_iter()
+        .flat_map(|pre_settlements| {
+            ranked_placement_sequences(&pre_settlements.player, tokens, request)
+                .into_iter()
+                .map(move |placement| (pre_settlements.clone(), placement))
+        })
+        .flat_map(|(pre_settlements, placement)| {
+            draft_branches(&placement.player, request)
+                .into_iter()
+                .map(move |draft| (pre_settlements.clone(), placement.clone(), draft))
+        })
+        .flat_map(|(pre_settlements, placement, draft)| {
+            ranked_settlement_sequences(&draft.player, request, POST_SETTLEMENT_BEAM_WIDTH)
+                .into_iter()
+                .map(move |post_settlements| {
+                    (
+                        pre_settlements.clone(),
+                        placement.clone(),
+                        draft.clone(),
+                        post_settlements,
+                    )
+                })
+        })
+        .map(|(pre_settlements, placement, draft, post_settlements)| {
+            let mut actions = vec![MoveActionV1::TakeGroup {
+                group_index,
+                tokens: tokens.to_vec(),
+            }];
+            actions.extend(settlement_actions(pre_settlements.settlements));
+            if let Some(card) = draft.card {
+                actions.push(MoveActionV1::DraftCard {
+                    card_id: card.card_id,
+                    type_arg: card.type_arg,
+                });
+            }
+            actions.extend(
+                placement
+                    .steps
+                    .into_iter()
+                    .map(|step| MoveActionV1::PlaceToken {
+                        token: step.token,
+                        col: step.coord.col,
+                        row: step.coord.row,
+                    }),
+            );
+            actions.extend(settlement_actions(post_settlements.settlements));
+            let score_breakdown = score_player(
+                &post_settlements.player,
+                request.snapshot.board_side,
+                &request.catalog,
+            );
+            MovePlanV1 {
+                central_group_index: group_index,
+                ordered_actions: actions,
+                score_estimate: score_breakdown.total(),
+                score_breakdown,
+            }
+        })
+        .max_by_key(|plan| plan.score_estimate)
 }
 
-fn best_cell_for_token(
+#[derive(Clone)]
+struct DraftBranch {
+    card: Option<crate::model::ActiveCard>,
+    player: PlayerState,
+}
+
+fn draft_branches(player: &PlayerState, request: &AdvisorRequestV1) -> Vec<DraftBranch> {
+    let mut branches = vec![DraftBranch {
+        card: None,
+        player: player.clone(),
+    }];
+    if player.active_cards.len() >= 4 {
+        return branches;
+    }
+    branches.extend(request.snapshot.river_cards.iter().cloned().map(|card| {
+        let mut next_player = player.clone();
+        next_player.active_cards.push(card.clone());
+        DraftBranch {
+            card: Some(card),
+            player: next_player,
+        }
+    }));
+    branches
+}
+
+fn ranked_placement_sequences(
     player: &PlayerState,
-    token: Color,
+    tokens: &[Color],
     request: &AdvisorRequestV1,
-) -> Option<(usize, i32)> {
-    player
-        .cells
-        .iter()
-        .enumerate()
-        .filter_map(|(index, _)| {
-            let mut candidate = player.clone();
-            place_token(&mut candidate.cells[index], token).ok()?;
-            let score =
-                score_player(&candidate, request.snapshot.board_side, &request.catalog).total();
-            Some((index, score))
+) -> Vec<crate::moves::PlacementSequence> {
+    let mut scored: Vec<_> = generate_placement_sequences(player, tokens)
+        .into_iter()
+        .map(|sequence| {
+            let score = score_player(
+                &sequence.player,
+                request.snapshot.board_side,
+                &request.catalog,
+            )
+            .total();
+            (score, sequence)
         })
-        .max_by_key(|(_, score)| *score)
+        .collect();
+    scored.sort_by(|left, right| right.0.cmp(&left.0));
+    scored
+        .into_iter()
+        .take(placement_beam_width(request.snapshot.board_side))
+        .map(|(_, sequence)| sequence)
+        .collect()
+}
+
+fn ranked_settlement_sequences(
+    player: &PlayerState,
+    request: &AdvisorRequestV1,
+    limit: usize,
+) -> Vec<crate::moves::SettlementSequence> {
+    let mut settlement_sequences = generate_settlement_sequences(player, &request.catalog);
+    settlement_sequences.sort_by(|left, right| {
+        let left_score =
+            score_player(&left.player, request.snapshot.board_side, &request.catalog).total();
+        let right_score =
+            score_player(&right.player, request.snapshot.board_side, &request.catalog).total();
+        right_score.cmp(&left_score)
+    });
+    settlement_sequences.into_iter().take(limit).collect()
+}
+
+fn settlement_actions(settlements: Vec<crate::moves::SettlementMove>) -> Vec<MoveActionV1> {
+    settlements
+        .into_iter()
+        .map(|settlement| MoveActionV1::SettleCard {
+            card_id: settlement.card_id,
+            type_arg: settlement.type_arg,
+            col: settlement.cube_coord.col,
+            row: settlement.cube_coord.row,
+        })
+        .collect()
+}
+
+fn placement_beam_width(board_side: BoardSide) -> usize {
+    match board_side {
+        BoardSide::SideA => PLACEMENT_BEAM_WIDTH,
+        BoardSide::SideB => PLACEMENT_BEAM_WIDTH,
+    }
 }
 
 #[cfg(test)]

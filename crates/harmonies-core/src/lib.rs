@@ -3,6 +3,7 @@ pub mod bga;
 pub mod cards;
 pub mod geometry;
 pub mod model;
+pub mod moves;
 pub mod rules;
 pub mod scoring;
 

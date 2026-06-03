@@ -2,7 +2,8 @@
   function createAdvisorClient() {
     return {
       async getRecommendation(gamedatas) {
-        return window.HarmoniesMockAdvisor.recommend(gamedatas);
+        const snapshot = window.HarmoniesBgaNormalizer.normalizeGamedatas(gamedatas);
+        return window.HarmoniesMockAdvisor.recommend(snapshot);
       },
     };
   }

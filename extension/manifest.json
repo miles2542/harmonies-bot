@@ -7,7 +7,13 @@
   "content_scripts": [
     {
       "matches": ["https://boardgamearena.com/*", "https://*.boardgamearena.com/*"],
-      "js": ["src/overlay.js", "src/mockAdvisor.js", "src/advisorClient.js", "src/contentScript.js"],
+      "js": [
+        "src/overlay.js",
+        "src/normalizer.js",
+        "src/mockAdvisor.js",
+        "src/advisorClient.js",
+        "src/contentScript.js"
+      ],
       "css": ["src/styles.css"],
       "run_at": "document_idle"
     }

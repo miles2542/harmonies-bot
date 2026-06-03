@@ -18,6 +18,7 @@ pub struct CardPatternStep {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CardDefinition {
+    #[serde(alias = "type_arg")]
     pub type_arg: u8,
     pub point_locations: Vec<i32>,
     pub pattern: Vec<CardPatternStep>,
@@ -145,5 +146,15 @@ mod tests {
             tokens: vec![Color::Mountain, Color::Building],
         };
         assert!(stack_matches_colors(&stack, &[6, 7]));
+    }
+
+    #[test]
+    fn parses_project_cards_database() {
+        let catalog = CardCatalog::from_cards_database_json(include_str!(
+            "../../../docs/cards_database.json"
+        ))
+        .unwrap();
+        assert_eq!(catalog.cards.len(), 42);
+        assert!(catalog.get(33).unwrap().is_spirit);
     }
 }
