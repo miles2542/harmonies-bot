@@ -3,7 +3,12 @@
   "name": "Harmonies BGA Advisor",
   "version": "0.1.0",
   "description": "Read-only Harmonies advisor overlay for active BGA participants.",
-  "permissions": ["https://boardgamearena.com/*", "https://*.boardgamearena.com/*"],
+  "permissions": [
+    "https://boardgamearena.com/*",
+    "https://*.boardgamearena.com/*",
+    "http://127.0.0.1:17848/*",
+    "ws://127.0.0.1:17848/*"
+  ],
   "content_scripts": [
     {
       "matches": ["https://boardgamearena.com/*", "https://*.boardgamearena.com/*"],

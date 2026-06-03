@@ -2,6 +2,7 @@
 members = [
     "crates/harmonies-core",
     "crates/harmonies-cli",
+    "crates/harmonies-service",
 ]
 resolver = "2"
 
