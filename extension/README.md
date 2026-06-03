@@ -18,6 +18,13 @@ cargo run -p harmonies-service
 
 Default endpoint: `http://127.0.0.1:17848/advise`.
 
+Optional tuned weights:
+
+```powershell
+$env:HARMONIES_WEIGHTS='docs\weights.baseline.json'
+cargo run -p harmonies-service
+```
+
 ## Behavior
 
 - Injects `pageBridge.js` into BGA page context.

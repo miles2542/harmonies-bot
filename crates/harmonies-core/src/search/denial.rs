@@ -1,5 +1,6 @@
 use crate::{
     cards::CardCatalog,
+    eval::EvalWeights,
     model::{Color, GameSnapshotV1, PlayerState},
     scoring::score_player,
     turn::generate_current_turn_sequences,
@@ -8,7 +9,6 @@ use crate::{
 use super::{RootCandidate, SearchProgress};
 
 const OPPONENT_TURN_BEAM_WIDTH: usize = 32;
-const DENIAL_WEIGHT_PERCENT: i32 = 35;
 
 pub(super) fn opponent_denial_estimate(
     snapshot: &GameSnapshotV1,
@@ -41,21 +41,18 @@ pub(super) fn opponent_denial_estimate(
         .unwrap_or(0)
 }
 
-pub(super) fn utility_estimate(score_estimate: i32, opponent_denial_estimate: i32) -> i32 {
-    score_estimate + (opponent_denial_estimate * DENIAL_WEIGHT_PERCENT) / 100
-}
-
 pub(super) fn apply_opponent_denial(
     roots: &mut [RootCandidate],
     snapshot: &GameSnapshotV1,
     player: &PlayerState,
     catalog: &CardCatalog,
+    weights: &EvalWeights,
     progress: &mut SearchProgress,
 ) {
     for root in roots {
         root.opponent_denial_estimate =
             opponent_denial_estimate(snapshot, player, &root.tokens, catalog, progress);
         root.utility_estimate =
-            utility_estimate(root.future_estimate, root.opponent_denial_estimate);
+            weights.utility(root.future_estimate, root.opponent_denial_estimate);
     }
 }

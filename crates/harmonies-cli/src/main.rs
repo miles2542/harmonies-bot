@@ -3,7 +3,7 @@ use std::{fs, io::Read, path::PathBuf};
 use anyhow::Context;
 use harmonies_core::{
     advise, bga::normalize_gamedatas, scoring::score_player, AdvisorRequestV1, CardCatalog,
-    GameSnapshotV1,
+    EvalWeights, GameSnapshotV1,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -25,6 +25,7 @@ fn main() -> anyhow::Result<()> {
         .next()
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("docs/cards_database.json"));
+    let weights_path = args.next().map(PathBuf::from);
 
     let mut input = String::new();
     if let Some(path) = request_path {
@@ -42,6 +43,9 @@ fn main() -> anyhow::Result<()> {
         .with_context(|| format!("failed to read catalog {}", catalog_path.display()))?;
     request.catalog =
         CardCatalog::from_cards_database_json(&catalog_json).context("failed to parse catalog")?;
+    if let Some(path) = weights_path {
+        request.weights = load_weights(&path)?;
+    }
 
     let response = advise(request);
     println!("{}", serde_json::to_string_pretty(&response)?);
@@ -147,6 +151,12 @@ fn load_catalog(path: &PathBuf) -> anyhow::Result<CardCatalog> {
     let input =
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
     CardCatalog::from_cards_database_json(&input).context("failed to parse catalog")
+}
+
+fn load_weights(path: &PathBuf) -> anyhow::Result<EvalWeights> {
+    let input =
+        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+    serde_json::from_str(&input).context("failed to parse weights")
 }
 
 #[derive(Debug, Serialize)]

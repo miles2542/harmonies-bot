@@ -21,12 +21,15 @@
 - Optimization target clarified: 2-player Side A with Nature Spirit enabled. Side B/3-4p remain correctness-compatible bonuses, not search-performance priorities.
 - `harmonies-cli score` and `tools.score_qa` added for scorer-vs-BGA final score parity checks.
 - Advisor now computes a cheap visible-opponent denial estimate per central token group and ranks by utility.
+- Eval weights are now externalized via `docs/weights.baseline.json`; service can load `HARMONIES_WEIGHTS`.
+- `tools.train_weights` generates candidate weight JSONL for later validated self-play tuning.
 
 ## Known Gaps
 
 - Need committed anonymized fixture corpus, not just ignored local `temp/` captures.
 - Need fixture set listed in [Snapshot QA](./Snapshot%20QA.md).
 - Need Side A 2p final-score parity fixture before training/tuning.
+- Self-play simulator/CMA-ES evaluator still pending; only weight schema and candidate generation exist.
 - Advisor now supports interleaved place/draft/settle ordering with bounded frontier search.
 - Future search does not know exact hidden animal-card deck order; river replacements are sampled from unseen standard cards.
 - Opponent handling is v1 heuristic only: visible current-board value for central token groups, not full opponent future search.

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     cards::CardCatalog,
+    eval::EvalWeights,
     model::{Color, GameSnapshotV1},
     scoring::ScoreBreakdown,
     search::{search_current_player_turn_with_progress, SearchOutcome, SearchProgress},
@@ -20,6 +21,8 @@ pub struct AdvisorRequestV1 {
     pub runtime_mode: String,
     #[serde(default)]
     pub catalog: CardCatalog,
+    #[serde(default)]
+    pub weights: EvalWeights,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -117,6 +120,7 @@ pub fn advise_with_progress(
         &request.snapshot,
         &player,
         &request.catalog,
+        &request.weights,
         request.max_results,
         request.seed,
         request.time_budget_ms,
@@ -230,6 +234,7 @@ mod tests {
             seed: 1,
             runtime_mode: "native".into(),
             catalog: CardCatalog::default(),
+            weights: EvalWeights::default(),
         });
         assert_eq!(response.status, AdvisorStatus::Ready);
         assert_eq!(response.best_moves[0].ordered_actions.len(), 4);

@@ -9,13 +9,14 @@ use serde::{Deserialize, Serialize};
 use crate::{
     advisor::{turn_step_action, MoveActionV1, MovePlanV1},
     cards::CardCatalog,
+    eval::EvalWeights,
     model::{ActiveCard, BagCounts, BoardSide, Color, GameSnapshotV1, PlayerState},
     scoring::{score_player, ScoreBreakdown},
     turn::{generate_current_turn_sequences, TurnSequence},
 };
 
 use deck::{initial_unseen_standard_cards, river_after_turn_with_refills};
-use denial::{apply_opponent_denial, utility_estimate};
+use denial::apply_opponent_denial;
 use refill::candidate_refills;
 
 const ROOT_TURN_BEAM_WIDTH: usize = 512;
@@ -63,31 +64,11 @@ struct FutureState {
     score: i32,
 }
 
-pub fn search_current_player_turn(
-    snapshot: &GameSnapshotV1,
-    player: &PlayerState,
-    catalog: &CardCatalog,
-    max_results: usize,
-    seed: u64,
-    time_budget_ms: u64,
-    started: Instant,
-) -> SearchOutcome {
-    search_current_player_turn_with_progress(
-        snapshot,
-        player,
-        catalog,
-        max_results,
-        seed,
-        time_budget_ms,
-        started,
-        |_| {},
-    )
-}
-
 pub fn search_current_player_turn_with_progress(
     snapshot: &GameSnapshotV1,
     player: &PlayerState,
     catalog: &CardCatalog,
+    weights: &EvalWeights,
     max_results: usize,
     seed: u64,
     time_budget_ms: u64,
@@ -102,7 +83,7 @@ pub fn search_current_player_turn_with_progress(
         warnings.push("bag counts unavailable; future refill search disabled".into());
     }
 
-    let mut roots = root_candidates(snapshot, player, catalog, &mut progress);
+    let mut roots = root_candidates(snapshot, player, catalog, weights, &mut progress);
     if roots.is_empty() {
         return SearchOutcome {
             plans: Vec::new(),
@@ -122,7 +103,14 @@ pub fn search_current_player_turn_with_progress(
         progress: progress.clone(),
         warnings: warnings.clone(),
     });
-    apply_opponent_denial(&mut roots, snapshot, player, catalog, &mut progress);
+    apply_opponent_denial(
+        &mut roots,
+        snapshot,
+        player,
+        catalog,
+        weights,
+        &mut progress,
+    );
     on_progress(SearchOutcome {
         plans: sorted_plans(&roots, max_results),
         progress: progress.clone(),
@@ -138,6 +126,7 @@ pub fn search_current_player_turn_with_progress(
             &mut roots,
             snapshot,
             catalog,
+            weights,
             seed,
             depth,
             deadline,
@@ -174,6 +163,7 @@ fn root_candidates(
     snapshot: &GameSnapshotV1,
     player: &PlayerState,
     catalog: &CardCatalog,
+    weights: &EvalWeights,
     progress: &mut SearchProgress,
 ) -> Vec<RootCandidate> {
     let mut roots = Vec::new();
@@ -199,7 +189,7 @@ fn root_candidates(
             turn: best_turn,
             immediate,
             future_estimate,
-            utility_estimate: future_estimate,
+            utility_estimate: weights.utility(future_estimate, 0),
             opponent_denial_estimate: 0,
         });
     }
@@ -210,6 +200,7 @@ fn estimate_depth(
     roots: &mut [RootCandidate],
     snapshot: &GameSnapshotV1,
     catalog: &CardCatalog,
+    weights: &EvalWeights,
     seed: u64,
     depth: usize,
     deadline: Instant,
@@ -232,7 +223,7 @@ fn estimate_depth(
         );
         root.future_estimate = future.max(root.immediate.total());
         root.utility_estimate =
-            utility_estimate(root.future_estimate, root.opponent_denial_estimate);
+            weights.utility(root.future_estimate, root.opponent_denial_estimate);
     }
 }
 

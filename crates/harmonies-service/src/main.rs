@@ -10,20 +10,22 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use harmonies_core::{advise, advise_with_progress, AdvisorRequestV1, CardCatalog};
+use harmonies_core::{advise, advise_with_progress, AdvisorRequestV1, CardCatalog, EvalWeights};
 use tokio::sync::mpsc;
 use tower_http::cors::CorsLayer;
 
 #[derive(Clone)]
 struct AppState {
     catalog: CardCatalog,
+    weights: EvalWeights,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = ServiceConfig::from_env();
     let catalog = load_catalog(&config.catalog_path)?;
-    let state = Arc::new(AppState { catalog });
+    let weights = load_weights(&config.weights_path).unwrap_or_default();
+    let state = Arc::new(AppState { catalog, weights });
     let app = Router::new()
         .route("/health", get(health))
         .route("/advise", post(advise_http))
@@ -51,6 +53,7 @@ async fn advise_http(
     Json(mut request): Json<AdvisorRequestV1>,
 ) -> Json<harmonies_core::AdvisorResponseV1> {
     request.catalog = state.catalog.clone();
+    request.weights = state.weights.clone();
     Json(advise(request))
 }
 
@@ -99,6 +102,7 @@ async fn stream_advice(
             .await;
     };
     request.catalog = state.catalog.clone();
+    request.weights = state.weights.clone();
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
     let progress_tx = tx.clone();
     tokio::task::spawn_blocking(move || {
@@ -129,10 +133,17 @@ fn load_catalog(path: &PathBuf) -> anyhow::Result<CardCatalog> {
     CardCatalog::from_cards_database_json(&input).context("failed to parse card catalog")
 }
 
+fn load_weights(path: &PathBuf) -> anyhow::Result<EvalWeights> {
+    let input =
+        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+    serde_json::from_str(&input).context("failed to parse weights")
+}
+
 #[derive(Clone, Debug)]
 struct ServiceConfig {
     addr: SocketAddr,
     catalog_path: PathBuf,
+    weights_path: PathBuf,
 }
 
 impl ServiceConfig {
@@ -149,7 +160,14 @@ impl ServiceConfig {
         let catalog_path = std::env::var("HARMONIES_CATALOG")
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from("docs/cards_database.json"));
-        Self { addr, catalog_path }
+        let weights_path = std::env::var("HARMONIES_WEIGHTS")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("docs/weights.baseline.json"));
+        Self {
+            addr,
+            catalog_path,
+            weights_path,
+        }
     }
 }
 
