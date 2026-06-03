@@ -3,6 +3,9 @@
 Use `tools/snapshot_qa.py` to summarize raw BGA `gameui.gamedatas` captures and normalized
 `GameSnapshotV1` JSON from `harmonies-cli normalize`.
 
+Primary fixture priority is 2-player Side A with Nature Spirit enabled. Side B and 3-4 player
+captures are useful for compatibility, but should not drive search-performance tradeoffs.
+
 ## Commands
 
 ```powershell
@@ -11,6 +14,7 @@ cargo run -q -p harmonies-cli -- normalize snapshots\raw\turn.json player_1 `
 
 python tools\snapshot_qa.py snapshots\raw\turn.json snapshots\normalized\turn.json
 python tools\snapshot_qa.py --json --compare snapshots\raw\turn.json snapshots\normalized\turn.json
+python -m tools.score_qa snapshots\raw\final.json --expected player_1=84 --expected player_2=79
 ```
 
 Default output is human-readable. `--json` output is intended for fixture logs and `jq`.
@@ -56,6 +60,7 @@ python tools\snapshot_anonymizer.py snapshots\raw\turn.json snapshots\raw\turn.a
 - Numeric BGA player IDs mapped to anonymized `player_1` style IDs.
 - Near-endgame snapshot with low `emptyHexes`.
 - Negative fixture with missing or malformed optional fields for QA warnings.
+- Side A 2p final/post-game snapshot with exact BGA final totals for both players.
 
 ## Known Caveats
 

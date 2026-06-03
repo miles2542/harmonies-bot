@@ -1,7 +1,11 @@
 use std::{fs, io::Read, path::PathBuf};
 
 use anyhow::Context;
-use harmonies_core::{advise, bga::normalize_gamedatas, AdvisorRequestV1, CardCatalog};
+use harmonies_core::{
+    advise, bga::normalize_gamedatas, scoring::score_player, AdvisorRequestV1, CardCatalog,
+    GameSnapshotV1,
+};
+use serde::Serialize;
 use serde_json::Value;
 
 fn main() -> anyhow::Result<()> {
@@ -9,6 +13,10 @@ fn main() -> anyhow::Result<()> {
     if matches!(args.first().map(String::as_str), Some("normalize")) {
         args.remove(0);
         return normalize_command(args);
+    }
+    if matches!(args.first().map(String::as_str), Some("score")) {
+        args.remove(0);
+        return score_command(args);
     }
 
     let mut args = args.into_iter();
@@ -54,4 +62,107 @@ fn normalize_command(args: Vec<String>) -> anyhow::Result<()> {
         normalize_gamedatas(gamedatas, perspective).context("failed to normalize BGA")?;
     println!("{}", serde_json::to_string_pretty(&snapshot)?);
     Ok(())
+}
+
+fn score_command(args: Vec<String>) -> anyhow::Result<()> {
+    let path = args.first().map(PathBuf::from).context(
+        "usage: harmonies-cli score <snapshot.json> [--perspective ID] [--catalog PATH]",
+    )?;
+    let options = ScoreCommandOptions::parse(&args[1..])?;
+    let input =
+        fs::read_to_string(&path).with_context(|| format!("failed to read {}", path.display()))?;
+    let raw: Value = serde_json::from_str(&input).context("failed to parse snapshot JSON")?;
+    let snapshot = snapshot_from_value(raw, options.perspective.as_deref())?;
+    let catalog = load_catalog(&options.catalog_path)?;
+    let players = snapshot
+        .players
+        .iter()
+        .map(|player| {
+            let breakdown = score_player(player, snapshot.board_side, &catalog);
+            PlayerScoreReport {
+                player_id: player.player_id.clone(),
+                total: breakdown.total(),
+                breakdown,
+            }
+        })
+        .collect();
+    let report = ScoreReport {
+        schema_version: snapshot.schema_version,
+        perspective_player_id: snapshot.perspective_player_id,
+        active_player_id: snapshot.active_player_id,
+        board_side: snapshot.board_side,
+        players,
+    };
+    println!("{}", serde_json::to_string_pretty(&report)?);
+    Ok(())
+}
+
+#[derive(Debug)]
+struct ScoreCommandOptions {
+    perspective: Option<String>,
+    catalog_path: PathBuf,
+}
+
+impl ScoreCommandOptions {
+    fn parse(args: &[String]) -> anyhow::Result<Self> {
+        let mut perspective = None;
+        let mut catalog_path = PathBuf::from("docs/cards_database.json");
+        let mut index = 0;
+        while index < args.len() {
+            match args[index].as_str() {
+                "--perspective" => {
+                    perspective = Some(
+                        args.get(index + 1)
+                            .cloned()
+                            .context("--perspective requires an id")?,
+                    );
+                    index += 2;
+                }
+                "--catalog" => {
+                    catalog_path = args
+                        .get(index + 1)
+                        .map(PathBuf::from)
+                        .context("--catalog requires a path")?;
+                    index += 2;
+                }
+                other => anyhow::bail!("unknown score option: {other}"),
+            }
+        }
+        Ok(Self {
+            perspective,
+            catalog_path,
+        })
+    }
+}
+
+fn snapshot_from_value(raw: Value, perspective: Option<&str>) -> anyhow::Result<GameSnapshotV1> {
+    if raw.get("schemaVersion").is_some() {
+        return serde_json::from_value(raw).context("failed to parse normalized GameSnapshotV1");
+    }
+    let gamedatas = raw.get("gamedatas").unwrap_or(&raw);
+    normalize_gamedatas(gamedatas, perspective).context("failed to normalize BGA")
+}
+
+fn load_catalog(path: &PathBuf) -> anyhow::Result<CardCatalog> {
+    let input =
+        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+    CardCatalog::from_cards_database_json(&input).context("failed to parse catalog")
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ScoreReport {
+    schema_version: u8,
+    perspective_player_id: String,
+    active_player_id: String,
+    board_side: harmonies_core::BoardSide,
+    players: Vec<PlayerScoreReport>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PlayerScoreReport {
+    player_id: String,
+    total: i32,
+    breakdown: harmonies_core::scoring::ScoreBreakdown,
 }
