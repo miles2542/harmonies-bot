@@ -114,7 +114,17 @@ pub fn find_pattern_matches<'a>(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
+
+    fn cell(col: i8, row: i8, tokens: Vec<Color>) -> Cell {
+        Cell {
+            coord: Coord { col, row },
+            stack: Stack { tokens },
+            locked_by_cube: false,
+        }
+    }
 
     #[test]
     fn card_score_uses_highest_revealed_value() {
@@ -149,6 +159,81 @@ mod tests {
     }
 
     #[test]
+    fn two_cell_pattern_matches_all_six_rotations() {
+        let definition = CardDefinition {
+            type_arg: 1,
+            point_locations: vec![1],
+            pattern: vec![
+                CardPatternStep {
+                    colors: vec![5],
+                    position: 0,
+                    allow_cube: false,
+                },
+                CardPatternStep {
+                    colors: vec![1],
+                    position: 3,
+                    allow_cube: true,
+                },
+            ],
+            is_spirit: false,
+            spirit_scoring_logic: None,
+        };
+        for direction in 0..DIRECTIONS {
+            let origin = Coord { col: 0, row: 0 };
+            let water = neighbor(origin, direction);
+            let field_cell = cell(origin.col, origin.row, vec![Color::Field]);
+            let water_cell = cell(water.col, water.row, vec![Color::Water]);
+            let cells: HashMap<Coord, &Cell> = [(&field_cell), (&water_cell)]
+                .into_iter()
+                .map(|cell| (cell.coord, cell))
+                .collect();
+            assert_eq!(find_pattern_matches(&cells, &definition).len(), 1);
+        }
+    }
+
+    #[test]
+    fn three_cell_chain_does_not_match_mirror() {
+        let definition = CardDefinition {
+            type_arg: 1,
+            point_locations: vec![1],
+            pattern: vec![
+                CardPatternStep {
+                    colors: vec![5],
+                    position: 0,
+                    allow_cube: false,
+                },
+                CardPatternStep {
+                    colors: vec![1],
+                    position: 3,
+                    allow_cube: true,
+                },
+                CardPatternStep {
+                    colors: vec![2],
+                    position: 1,
+                    allow_cube: false,
+                },
+            ],
+            is_spirit: false,
+            spirit_scoring_logic: None,
+        };
+        let origin = Coord { col: 0, row: 0 };
+        let water = neighbor(origin, 3);
+        let mirrored_mountain = neighbor(water, 5);
+        let field_cell = cell(origin.col, origin.row, vec![Color::Field]);
+        let water_cell = cell(water.col, water.row, vec![Color::Water]);
+        let mountain_cell = cell(
+            mirrored_mountain.col,
+            mirrored_mountain.row,
+            vec![Color::Mountain],
+        );
+        let cells: HashMap<Coord, &Cell> = [&field_cell, &water_cell, &mountain_cell]
+            .into_iter()
+            .map(|cell| (cell.coord, cell))
+            .collect();
+        assert!(find_pattern_matches(&cells, &definition).is_empty());
+    }
+
+    #[test]
     fn parses_project_cards_database() {
         let catalog = CardCatalog::from_cards_database_json(include_str!(
             "../../../docs/cards_database.json"
@@ -156,5 +241,12 @@ mod tests {
         .unwrap();
         assert_eq!(catalog.cards.len(), 42);
         assert!(catalog.get(33).unwrap().is_spirit);
+        assert!(catalog.cards.values().all(|card| {
+            card.pattern
+                .iter()
+                .filter(|step| step.allow_cube)
+                .count()
+                == 1
+        }));
     }
 }
