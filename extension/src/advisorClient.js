@@ -1,5 +1,6 @@
 (function harmoniesAdvisorClientModule() {
   const SERVICE_URL = "http://127.0.0.1:17848/advise";
+  const SERVICE_WS_URL = "ws://127.0.0.1:17848/ws";
   const SERVICE_TIMEOUT_MS = 50000;
   const COLOR_LABELS = {
     water: "Water",
@@ -12,10 +13,10 @@
 
   function createAdvisorClient() {
     return {
-      async getRecommendation(gamedatas) {
+      async getRecommendation(gamedatas, onUpdate) {
         const snapshot = window.HarmoniesBgaNormalizer.normalizeGamedatas(gamedatas);
         try {
-          const response = await requestNativeAdvisor(snapshot);
+          const response = await requestNativeAdvisor(snapshot, onUpdate);
           return adaptAdvisorResponse(response);
         } catch (error) {
           const mock = window.HarmoniesMockAdvisor.recommend(snapshot);
@@ -26,20 +27,33 @@
     };
   }
 
-  async function requestNativeAdvisor(snapshot) {
+  async function requestNativeAdvisor(snapshot, onUpdate) {
+    const request = buildAdvisorRequest(snapshot);
+    try {
+      return await requestNativeAdvisorWs(request, onUpdate);
+    } catch (_error) {
+      return requestNativeAdvisorHttp(request);
+    }
+  }
+
+  function buildAdvisorRequest(snapshot) {
+    return {
+      snapshot,
+      timeBudgetMs: 48000,
+      maxResults: 3,
+      seed: Date.now(),
+      runtimeMode: "native-service",
+    };
+  }
+
+  async function requestNativeAdvisorHttp(request) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), SERVICE_TIMEOUT_MS);
     try {
       const response = await fetch(SERVICE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          snapshot,
-          timeBudgetMs: 48000,
-          maxResults: 3,
-          seed: Date.now(),
-          runtimeMode: "native-service",
-        }),
+        body: JSON.stringify(request),
         signal: controller.signal,
       });
       if (!response.ok) {
@@ -49,6 +63,45 @@
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  function requestNativeAdvisorWs(request, onUpdate) {
+    return new Promise((resolve, reject) => {
+      const socket = new WebSocket(SERVICE_WS_URL);
+      let settled = false;
+      const timeout = setTimeout(() => {
+        socket.close();
+        settled = true;
+        reject(new Error("WebSocket timeout"));
+      }, SERVICE_TIMEOUT_MS);
+      socket.addEventListener("open", () => socket.send(JSON.stringify(request)));
+      socket.addEventListener("message", (event) => {
+        const message = JSON.parse(event.data);
+        if (message.event !== "advisorResponse" || !message.response) {
+          return;
+        }
+        if (message.final) {
+          clearTimeout(timeout);
+          settled = true;
+          socket.close();
+          resolve(message.response);
+        } else if (onUpdate) {
+          onUpdate(adaptAdvisorResponse(message.response));
+        }
+      });
+      socket.addEventListener("error", () => {
+        clearTimeout(timeout);
+        settled = true;
+        reject(new Error("WebSocket unavailable"));
+      });
+      socket.addEventListener("close", () => {
+        clearTimeout(timeout);
+        if (!settled) {
+          settled = true;
+          reject(new Error("WebSocket closed"));
+        }
+      });
+    });
   }
 
   function adaptAdvisorResponse(response) {

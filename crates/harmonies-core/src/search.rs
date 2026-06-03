@@ -4,6 +4,8 @@ use std::{
 };
 
 mod refill;
+#[cfg(test)]
+mod tests;
 
 use serde::{Deserialize, Serialize};
 
@@ -67,6 +69,28 @@ pub fn search_current_player_turn(
     time_budget_ms: u64,
     started: Instant,
 ) -> SearchOutcome {
+    search_current_player_turn_with_progress(
+        snapshot,
+        player,
+        catalog,
+        max_results,
+        seed,
+        time_budget_ms,
+        started,
+        |_| {},
+    )
+}
+
+pub fn search_current_player_turn_with_progress(
+    snapshot: &GameSnapshotV1,
+    player: &PlayerState,
+    catalog: &CardCatalog,
+    max_results: usize,
+    seed: u64,
+    time_budget_ms: u64,
+    started: Instant,
+    mut on_progress: impl FnMut(SearchOutcome),
+) -> SearchOutcome {
     let deadline =
         started + Duration::from_millis(time_budget_ms.saturating_sub(HARD_STOP_MARGIN_MS));
     let mut progress = SearchProgress::default();
@@ -90,6 +114,11 @@ pub fn search_current_player_turn(
     if !snapshot.river_cards.is_empty() {
         warnings.push("future card river refill not modeled yet".into());
     }
+    on_progress(SearchOutcome {
+        plans: sorted_plans(&roots, max_results),
+        progress: progress.clone(),
+        warnings: warnings.clone(),
+    });
 
     for depth in 1..=FUTURE_DEPTH {
         if Instant::now() >= deadline {
@@ -110,13 +139,21 @@ pub fn search_current_player_turn(
         }
     }
 
-    roots.sort_by(|left, right| right.future_estimate.cmp(&left.future_estimate));
-    roots.truncate(max_results.max(1));
     SearchOutcome {
-        plans: roots.into_iter().map(root_plan).collect(),
+        plans: sorted_plans(&roots, max_results),
         progress,
         warnings,
     }
+}
+
+fn sorted_plans(roots: &[RootCandidate], max_results: usize) -> Vec<MovePlanV1> {
+    let mut roots = roots.to_vec();
+    roots.sort_by(|left, right| right.future_estimate.cmp(&left.future_estimate));
+    roots
+        .into_iter()
+        .take(max_results.max(1))
+        .map(root_plan)
+        .collect()
 }
 
 fn root_candidates(
@@ -325,43 +362,5 @@ fn root_plan(root: RootCandidate) -> MovePlanV1 {
         ordered_actions: actions,
         score_estimate: root.future_estimate,
         score_breakdown: root.immediate,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn river_after_turn_removes_drafted_card() {
-        let river = vec![
-            ActiveCard {
-                card_id: 1,
-                type_arg: 8,
-                remaining_cubes: 4,
-                is_spirit: false,
-            },
-            ActiveCard {
-                card_id: 2,
-                type_arg: 9,
-                remaining_cubes: 4,
-                is_spirit: false,
-            },
-        ];
-        let turn = TurnSequence {
-            steps: vec![TurnStep::DraftCard {
-                card_id: 1,
-                type_arg: 8,
-            }],
-            player: PlayerState {
-                player_id: "p1".into(),
-                cells: Vec::new(),
-                active_cards: Vec::new(),
-                completed_cards: Vec::new(),
-                empty_hexes: 0,
-            },
-        };
-        assert_eq!(river_after_turn(&river, &turn).len(), 1);
-        assert_eq!(river_after_turn(&river, &turn)[0].card_id, 2);
     }
 }

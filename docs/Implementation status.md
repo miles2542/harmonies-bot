@@ -15,7 +15,8 @@
 - Advisor now applies bounded stochastic future-turn search with deterministic token-refill samples (`K=50`, `N=3`, `M=10` target shape) after legal current-turn generation.
 - Rich Side B local benchmark: 30s budget returns in ~18s; 48s budget returns in ~36s with future depth progress.
 - `harmonies-service` native localhost service exposes `/health`, `/advise`, and `/ws`.
-- Firefox extension tries local Rust service first, then falls back to mock advisor when unavailable.
+- Firefox extension streams `/ws` progress from local Rust service, with HTTP/mock fallback.
+- Rich Side B WebSocket smoke: first streamed response ~8s, final 30s-budget response ~17.5s.
 
 ## Known Gaps
 
@@ -25,5 +26,5 @@
 - Future search does not model animal-card deck/river refill yet; drafted cards are removed from visible river, unknown replacement is omitted.
 - Future search does not model opponent turns yet beyond central-board availability; denial/hate-draft heuristic still pending.
 - WASM runtime gate pending; native service path exists.
-- Extension uses native service when running, mock fallback otherwise.
+- Extension uses native service when running, streaming WebSocket first; mock fallback otherwise.
 - Real BGA DOM selectors for token group highlights need snapshot/manual validation.

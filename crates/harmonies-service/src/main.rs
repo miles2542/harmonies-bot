@@ -10,7 +10,8 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use harmonies_core::{advise, AdvisorRequestV1, CardCatalog};
+use harmonies_core::{advise, advise_with_progress, AdvisorRequestV1, CardCatalog};
+use tokio::sync::mpsc;
 use tower_http::cors::CorsLayer;
 
 #[derive(Clone)]
@@ -65,35 +66,61 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
         let Message::Text(text) = message else {
             continue;
         };
-        let response = match serde_json::from_str::<AdvisorRequestV1>(&text) {
-            Ok(mut request) => {
-                request.catalog = state.catalog.clone();
-                serde_json::to_string(&advise(request))
-            }
-            Err(error) => serde_json::to_string(&serde_json::json!({
-                "status": "invalidSnapshot",
-                "elapsedMs": 0,
-                "bestMoves": [],
-                "progress": {
-                    "depthCompleted": 0,
-                    "nodesEvaluated": 0,
-                    "stoppedEarly": false
-                },
-                "warnings": [format!("request parse error: {error}")]
-            })),
-        };
-        let Ok(payload) = response else {
-            let _ = socket
-                .send(Message::Text(String::from(
-                    "{\"status\":\"invalidSnapshot\"}",
-                )))
-                .await;
-            continue;
-        };
-        if socket.send(Message::Text(payload)).await.is_err() {
+        if stream_advice(&mut socket, text, state.clone())
+            .await
+            .is_err()
+        {
             return;
         }
     }
+}
+
+async fn stream_advice(
+    socket: &mut WebSocket,
+    text: String,
+    state: Arc<AppState>,
+) -> Result<(), axum::Error> {
+    let Ok(mut request) = serde_json::from_str::<AdvisorRequestV1>(&text) else {
+        return socket
+            .send(Message::Text(advisor_event(
+                true,
+                serde_json::json!({
+                    "status": "invalidSnapshot",
+                    "elapsedMs": 0,
+                    "bestMoves": [],
+                    "progress": {
+                        "depthCompleted": 0,
+                        "nodesEvaluated": 0,
+                        "stoppedEarly": false
+                    },
+                    "warnings": ["request parse error"]
+                }),
+            )))
+            .await;
+    };
+    request.catalog = state.catalog.clone();
+    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+    let progress_tx = tx.clone();
+    tokio::task::spawn_blocking(move || {
+        let final_response = advise_with_progress(request, |response| {
+            let _ = progress_tx.send(advisor_event(false, response));
+        });
+        let _ = tx.send(advisor_event(true, final_response));
+    });
+
+    while let Some(payload) = rx.recv().await {
+        socket.send(Message::Text(payload)).await?;
+    }
+    Ok(())
+}
+
+fn advisor_event(final_event: bool, response: impl serde::Serialize) -> String {
+    serde_json::to_string(&serde_json::json!({
+        "event": "advisorResponse",
+        "final": final_event,
+        "response": response
+    }))
+    .unwrap_or_else(|_| String::from("{\"event\":\"advisorResponse\",\"final\":true}"))
 }
 
 fn load_catalog(path: &PathBuf) -> anyhow::Result<CardCatalog> {

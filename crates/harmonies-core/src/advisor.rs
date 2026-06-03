@@ -6,7 +6,7 @@ use crate::{
     cards::CardCatalog,
     model::{Color, GameSnapshotV1},
     scoring::ScoreBreakdown,
-    search::{search_current_player_turn, SearchProgress},
+    search::{search_current_player_turn_with_progress, SearchOutcome, SearchProgress},
     turn::TurnStep,
 };
 
@@ -75,6 +75,13 @@ pub enum MoveActionV1 {
 }
 
 pub fn advise(request: AdvisorRequestV1) -> AdvisorResponseV1 {
+    advise_with_progress(request, |_| {})
+}
+
+pub fn advise_with_progress(
+    request: AdvisorRequestV1,
+    mut on_progress: impl FnMut(AdvisorResponseV1),
+) -> AdvisorResponseV1 {
     let started = Instant::now();
     let mut warnings = Vec::new();
 
@@ -104,7 +111,7 @@ pub fn advise(request: AdvisorRequestV1) -> AdvisorResponseV1 {
         };
     };
 
-    let outcome = search_current_player_turn(
+    let outcome = search_current_player_turn_with_progress(
         &request.snapshot,
         &player,
         &request.catalog,
@@ -112,22 +119,41 @@ pub fn advise(request: AdvisorRequestV1) -> AdvisorResponseV1 {
         request.seed,
         request.time_budget_ms,
         started,
+        |outcome| {
+            on_progress(response_from_outcome(
+                &outcome,
+                started,
+                AdvisorStatus::Ready,
+                Vec::new(),
+            ));
+        },
     );
 
     if outcome.plans.is_empty() {
         warnings.push("no legal placement found for any central group".into());
     }
-    warnings.extend(outcome.warnings);
 
+    let status = if outcome.plans.is_empty() {
+        AdvisorStatus::NoLegalMove
+    } else {
+        AdvisorStatus::Ready
+    };
+    response_from_outcome(&outcome, started, status, warnings)
+}
+
+fn response_from_outcome(
+    outcome: &SearchOutcome,
+    started: Instant,
+    status: AdvisorStatus,
+    extra_warnings: Vec<String>,
+) -> AdvisorResponseV1 {
+    let mut warnings = extra_warnings;
+    warnings.extend(outcome.warnings.clone());
     AdvisorResponseV1 {
-        status: if outcome.plans.is_empty() {
-            AdvisorStatus::NoLegalMove
-        } else {
-            AdvisorStatus::Ready
-        },
+        status,
         elapsed_ms: started.elapsed().as_millis(),
-        best_moves: outcome.plans,
-        progress: outcome.progress,
+        best_moves: outcome.plans.clone(),
+        progress: outcome.progress.clone(),
         warnings,
     }
 }

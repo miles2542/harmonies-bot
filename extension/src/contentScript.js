@@ -43,7 +43,9 @@
     }
 
     overlay.setStatus("Analyzing visible state");
-    const response = await advisorClient.getRecommendation(gamedatas);
+    const response = await advisorClient.getRecommendation(gamedatas, (partialResponse) => {
+      overlay.renderRecommendation(partialResponse);
+    });
     overlay.renderRecommendation(response);
   }
 
