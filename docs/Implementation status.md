@@ -24,6 +24,8 @@
 - Eval weights are now externalized via `docs/weights.baseline.json`; service can load `HARMONIES_WEIGHTS`.
 - `tools.train_weights` generates candidate weight JSONL for later validated self-play tuning.
 - Extension Stop button sends WebSocket stop command; Rust returns best-so-far at cancellation checkpoints.
+- `tools/bga_harmonies_capture.user.js` adds one-click BGA snapshot download/copy for Side A scorer fixtures.
+- `tools.score_qa --use-capture-scores` can compare against capture `scoreHints` when ids match.
 
 ## Known Gaps
 

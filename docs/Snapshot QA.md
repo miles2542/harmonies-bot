@@ -15,6 +15,7 @@ cargo run -q -p harmonies-cli -- normalize snapshots\raw\turn.json player_1 `
 python tools\snapshot_qa.py snapshots\raw\turn.json snapshots\normalized\turn.json
 python tools\snapshot_qa.py --json --compare snapshots\raw\turn.json snapshots\normalized\turn.json
 python -m tools.score_qa snapshots\raw\final.json --expected player_1=84 --expected player_2=79
+python -m tools.score_qa snapshots\raw\final-capture.json --use-capture-scores
 ```
 
 Default output is human-readable. `--json` output is intended for fixture logs and `jq`.
@@ -33,6 +34,8 @@ Default output is human-readable. `--json` output is intended for fixture logs a
 ## Capture Checklist
 
 - Capture exact `window.gameui.gamedatas` after BGA UI finishes updating.
+- Optional helper: install `tools\bga_harmonies_capture.user.js` in ScriptCat/Tampermonkey and
+  click `Download`.
 - Record table context separately: date, player count, board side, turn phase, active player,
   notable action just completed.
 - Anonymize before sharing or committing fixture data:
@@ -45,6 +48,8 @@ python tools\snapshot_anonymizer.py snapshots\raw\turn.json snapshots\raw\turn.a
 - Run snapshot QA against raw/anonymized input and normalized output.
 - Save QA JSON beside fixture or in `logs\snapshot_qa\`.
 - Do not commit personal names, avatars, table IDs, chat, or unrelated BGA payload.
+- For final-score parity, record BGA final totals manually if capture `scoreHints` are empty or use
+  BGA numeric ids that do not match normalized/anonymized player ids.
 
 ## Required Fixture Types
 
