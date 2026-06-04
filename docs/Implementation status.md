@@ -49,14 +49,16 @@
   Spirit choice and late active turn.
 - `tools.service_smoke` starts `harmonies-service`, checks `/health`, checks cheap `/advise`, then
   verifies `/ws` returns a real Side A Spirit-choice plan.
+- `tools.evaluate_weights` ranks candidate weights by validated Rust self-play fitness over tracked
+  active-turn fixtures.
 
 ## Known Gaps
 
 - Need broader fixture set listed in [Snapshot QA](./Snapshot%20QA.md) beyond final-score parity.
 - Need more settlement-available active-turn fixtures if BGA exposes edge cases, but match 12 already
   covers early Spirit choice plus late active-turn search smoke.
-- CMA-ES evaluator still pending; self-play exists as gated smoke/tuning plumbing, not validated
-  training loop.
+- CMA-ES optimizer still pending; current tuning path is grid/candidate evaluation over validated
+  Rust self-play.
 - Early stop cancels between search phases/expansions, not inside one expensive current-turn generation.
 - Advisor now supports interleaved place/draft/settle ordering with bounded frontier search.
 - Future search does not know exact hidden animal-card deck order; river replacements are sampled from unseen standard cards.

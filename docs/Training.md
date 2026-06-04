@@ -44,6 +44,28 @@ python -m tools.train_weights --validated-scorer --out temp\training\weight_cand
 The output is JSONL candidate weights. Later self-play will consume this schema directly and export a
 chosen `weights.json`.
 
+## Candidate Evaluation
+
+Smoke:
+
+```powershell
+python -m tools.evaluate_weights --skip-score-gate --max-candidates 1 --max-turns 1 --turn-budget-ms 100 --out temp\training\evaluation-smoke.json
+```
+
+Longer CPU run:
+
+```powershell
+python -m tools.evaluate_weights `
+  --candidates temp\training\weight_candidates.jsonl `
+  --seeds 1,2,3,4,5 `
+  --max-turns 20 `
+  --turn-budget-ms 250 `
+  --out temp\training\evaluation.json
+```
+
+Fitness is `perspective player score - mean(opponents)` from Rust self-play reports. Current fixtures
+are active Side A 2p Nature Spirit snapshots, including first-turn Spirit choice and late active turn.
+
 ## Self-Play Smoke
 
 The Rust simulator can replay from a normalized or raw BGA snapshot. Use this only for smoke tests
@@ -65,8 +87,8 @@ After fixture corpus passes, add `--validated-scorer` and raise turn budget / tu
 - Parallelize by process/thread on CPU; GPU not needed.
 - Tune Side A 2p first.
 - Fitness: `score_self - score_opp`.
-- Start with grid/CMA-ES over cheap eval weights, then add richer feature weights only after scorer
-  parity and replay tests are stable.
+- Start with grid evaluation over cheap eval weights, then add CMA-ES/richer feature weights only
+  after replay tests are stable.
 
 ## Hardware Notes
 
