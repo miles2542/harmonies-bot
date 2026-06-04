@@ -45,6 +45,10 @@
   token/card refills for smoke testing and future tuning.
 - Tracked scorer parity corpus exists in `fixtures/score_parity`: five anonymized Side A 2p Nature
   Spirit BGA finals with exact expected totals. Run with `python -m tools.score_fixture_corpus`.
+- Tracked active-turn advisor request fixtures exist in `fixtures/advisor_requests`, including first-turn
+  Spirit choice and late active turn.
+- `tools.service_smoke` starts `harmonies-service`, checks `/health`, checks cheap `/advise`, then
+  verifies `/ws` returns a real Side A Spirit-choice plan.
 
 ## Known Gaps
 

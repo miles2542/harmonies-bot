@@ -25,6 +25,14 @@ $env:HARMONIES_WEIGHTS='docs\weights.baseline.json'
 cargo run -p harmonies-service
 ```
 
+Service smoke:
+
+```powershell
+python -m tools.service_smoke
+```
+
+This starts a temporary local service, checks `/health`, `/advise`, and `/ws`, then stops it.
+
 ## Behavior
 
 - Injects `pageBridge.js` into BGA page context.

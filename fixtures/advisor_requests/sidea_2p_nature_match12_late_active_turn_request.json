@@ -1,0 +1,679 @@
+{
+  "snapshot": {
+    "schemaVersion": 1,
+    "perspectivePlayerId": "player_1",
+    "activePlayerId": "player_1",
+    "boardSide": "sideA",
+    "players": [
+      {
+        "playerId": "player_2",
+        "cells": [
+          {
+            "coord": {
+              "col": 0,
+              "row": 0
+            },
+            "stack": {
+              "tokens": [
+                "field"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 1
+            },
+            "stack": {
+              "tokens": [
+                "mountain",
+                "building"
+              ]
+            },
+            "lockedByCube": true
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 2
+            },
+            "stack": {
+              "tokens": [
+                "foliage"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 3
+            },
+            "stack": {
+              "tokens": [
+                "mountain",
+                "building"
+              ]
+            },
+            "lockedByCube": true
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 4
+            },
+            "stack": {
+              "tokens": [
+                "trunk",
+                "foliage"
+              ]
+            },
+            "lockedByCube": true
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 0
+            },
+            "stack": {
+              "tokens": [
+                "trunk",
+                "building"
+              ]
+            },
+            "lockedByCube": true
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 1
+            },
+            "stack": {
+              "tokens": [
+                "field"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 2
+            },
+            "stack": {
+              "tokens": [
+                "trunk"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 3
+            },
+            "stack": {
+              "tokens": [
+                "trunk"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 0
+            },
+            "stack": {
+              "tokens": [
+                "field"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 1
+            },
+            "stack": {
+              "tokens": [
+                "mountain",
+                "building"
+              ]
+            },
+            "lockedByCube": true
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 2
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 4
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 1
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 2
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 3
+            },
+            "stack": {
+              "tokens": [
+                "field"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 1
+            },
+            "stack": {
+              "tokens": [
+                "mountain"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 2
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 4
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          }
+        ],
+        "activeCards": [
+          {
+            "cardId": 7,
+            "typeArg": 25,
+            "remainingCubes": 2,
+            "isSpirit": false
+          },
+          {
+            "cardId": 35,
+            "typeArg": 17,
+            "remainingCubes": 2,
+            "isSpirit": false
+          },
+          {
+            "cardId": 38,
+            "typeArg": 6,
+            "remainingCubes": 4,
+            "isSpirit": false
+          }
+        ],
+        "spiritCardChoices": [],
+        "completedCards": [
+          {
+            "cardId": 9,
+            "typeArg": 9,
+            "remainingCubes": 0,
+            "isSpirit": false
+          },
+          {
+            "cardId": 29,
+            "typeArg": 37,
+            "remainingCubes": 0,
+            "isSpirit": true
+          }
+        ],
+        "emptyHexes": 10
+      },
+      {
+        "playerId": "player_1",
+        "cells": [
+          {
+            "coord": {
+              "col": 0,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 1
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 2
+            },
+            "stack": {
+              "tokens": [
+                "trunk"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 4
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 1
+            },
+            "stack": {
+              "tokens": [
+                "water"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 2
+            },
+            "stack": {
+              "tokens": [
+                "water"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 0
+            },
+            "stack": {
+              "tokens": [
+                "water"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 1
+            },
+            "stack": {
+              "tokens": [
+                "mountain"
+              ]
+            },
+            "lockedByCube": true
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 2
+            },
+            "stack": {
+              "tokens": [
+                "mountain"
+              ]
+            },
+            "lockedByCube": true
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 4
+            },
+            "stack": {
+              "tokens": [
+                "field"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 0
+            },
+            "stack": {
+              "tokens": [
+                "trunk"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 1
+            },
+            "stack": {
+              "tokens": [
+                "water"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 2
+            },
+            "stack": {
+              "tokens": [
+                "trunk"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 3
+            },
+            "stack": {
+              "tokens": [
+                "foliage"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 1
+            },
+            "stack": {
+              "tokens": [
+                "water"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 2
+            },
+            "stack": {
+              "tokens": [
+                "trunk"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 3
+            },
+            "stack": {
+              "tokens": [
+                "mountain"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 4
+            },
+            "stack": {
+              "tokens": [
+                "building"
+              ]
+            },
+            "lockedByCube": false
+          }
+        ],
+        "activeCards": [
+          {
+            "cardId": 24,
+            "typeArg": 41,
+            "remainingCubes": 1,
+            "isSpirit": true
+          },
+          {
+            "cardId": 30,
+            "typeArg": 21,
+            "remainingCubes": 1,
+            "isSpirit": false
+          },
+          {
+            "cardId": 32,
+            "typeArg": 16,
+            "remainingCubes": 3,
+            "isSpirit": false
+          },
+          {
+            "cardId": 37,
+            "typeArg": 32,
+            "remainingCubes": 2,
+            "isSpirit": false
+          }
+        ],
+        "spiritCardChoices": [],
+        "completedCards": [],
+        "emptyHexes": 8
+      }
+    ],
+    "centralTokenGroups": [
+      [
+        "foliage",
+        "water",
+        "mountain"
+      ],
+      [
+        "mountain",
+        "mountain",
+        "foliage"
+      ],
+      [
+        "foliage",
+        "field",
+        "water"
+      ],
+      [
+        "water",
+        "field",
+        "mountain"
+      ],
+      [
+        "field",
+        "water",
+        "foliage"
+      ]
+    ],
+    "riverCards": [
+      {
+        "cardId": 3,
+        "typeArg": 22,
+        "remainingCubes": 4,
+        "isSpirit": false
+      },
+      {
+        "cardId": 10,
+        "typeArg": 2,
+        "remainingCubes": 3,
+        "isSpirit": false
+      },
+      {
+        "cardId": 23,
+        "typeArg": 3,
+        "remainingCubes": 4,
+        "isSpirit": false
+      },
+      {
+        "cardId": 25,
+        "typeArg": 4,
+        "remainingCubes": 3,
+        "isSpirit": false
+      },
+      {
+        "cardId": 42,
+        "typeArg": 19,
+        "remainingCubes": 3,
+        "isSpirit": false
+      }
+    ],
+    "bagCounts": {
+      "water": 14,
+      "mountain": 12,
+      "trunk": 13,
+      "foliage": 12,
+      "field": 11,
+      "building": 10,
+      "unknown": 0
+    },
+    "cardsCatalogVersion": "bga"
+  },
+  "timeBudgetMs": 1500,
+  "maxResults": 3,
+  "seed": 1780583698740,
+  "runtimeMode": "native-service-smoke"
+}

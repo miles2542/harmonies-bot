@@ -1,0 +1,592 @@
+{
+  "snapshot": {
+    "schemaVersion": 1,
+    "perspectivePlayerId": "player_1",
+    "activePlayerId": "player_1",
+    "boardSide": "sideA",
+    "players": [
+      {
+        "playerId": "player_2",
+        "cells": [
+          {
+            "coord": {
+              "col": 0,
+              "row": 0
+            },
+            "stack": {
+              "tokens": [
+                "field"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 1
+            },
+            "stack": {
+              "tokens": [
+                "mountain",
+                "building"
+              ]
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 2
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 4
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 1
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 2
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 1
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 2
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 4
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 1
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 2
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 1
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 2
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 4
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          }
+        ],
+        "activeCards": [
+          {
+            "cardId": 9,
+            "typeArg": 9,
+            "remainingCubes": 3,
+            "isSpirit": false
+          },
+          {
+            "cardId": 29,
+            "typeArg": 37,
+            "remainingCubes": 1,
+            "isSpirit": true
+          }
+        ],
+        "spiritCardChoices": [],
+        "completedCards": [],
+        "emptyHexes": 21
+      },
+      {
+        "playerId": "player_1",
+        "cells": [
+          {
+            "coord": {
+              "col": 0,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 1
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 2
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 0,
+              "row": 4
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 1
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 2
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 1,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 1
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 2
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 2,
+              "row": 4
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 1
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 2
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 3,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 0
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 1
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 2
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 3
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          },
+          {
+            "coord": {
+              "col": 4,
+              "row": 4
+            },
+            "stack": {
+              "tokens": []
+            },
+            "lockedByCube": false
+          }
+        ],
+        "activeCards": [],
+        "spiritCardChoices": [
+          {
+            "cardId": 19,
+            "typeArg": 38,
+            "remainingCubes": 1,
+            "isSpirit": true
+          },
+          {
+            "cardId": 24,
+            "typeArg": 41,
+            "remainingCubes": 1,
+            "isSpirit": true
+          }
+        ],
+        "completedCards": [],
+        "emptyHexes": 23
+      }
+    ],
+    "centralTokenGroups": [
+      [
+        "foliage",
+        "water",
+        "mountain"
+      ],
+      [
+        "foliage",
+        "trunk",
+        "field"
+      ],
+      [
+        "mountain",
+        "trunk",
+        "foliage"
+      ],
+      [
+        "water",
+        "field",
+        "mountain"
+      ],
+      [
+        "water",
+        "water",
+        "building"
+      ]
+    ],
+    "riverCards": [
+      {
+        "cardId": 7,
+        "typeArg": 25,
+        "remainingCubes": 2,
+        "isSpirit": false
+      },
+      {
+        "cardId": 25,
+        "typeArg": 4,
+        "remainingCubes": 3,
+        "isSpirit": false
+      },
+      {
+        "cardId": 30,
+        "typeArg": 21,
+        "remainingCubes": 3,
+        "isSpirit": false
+      },
+      {
+        "cardId": 38,
+        "typeArg": 6,
+        "remainingCubes": 4,
+        "isSpirit": false
+      },
+      {
+        "cardId": 42,
+        "typeArg": 19,
+        "remainingCubes": 3,
+        "isSpirit": false
+      }
+    ],
+    "bagCounts": {
+      "water": 19,
+      "mountain": 19,
+      "trunk": 19,
+      "foliage": 16,
+      "field": 16,
+      "building": 13,
+      "unknown": 0
+    },
+    "cardsCatalogVersion": "bga"
+  },
+  "timeBudgetMs": 1500,
+  "maxResults": 3,
+  "seed": 1780583698740,
+  "runtimeMode": "native-service-smoke"
+}

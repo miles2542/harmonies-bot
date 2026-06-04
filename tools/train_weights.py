@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 DEFAULT_DENIAL_GRID = [0, 15, 35, 50, 75]
 
 
@@ -45,7 +44,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Prepare eval-weight candidates for later tuning.")
     parser.add_argument("--baseline", type=Path, default=Path("docs/weights.baseline.json"))
     parser.add_argument("--out", type=Path, default=Path("temp/training/weight_candidates.jsonl"))
-    parser.add_argument("--denial-grid", default=",".join(str(value) for value in DEFAULT_DENIAL_GRID))
+    parser.add_argument(
+        "--denial-grid",
+        default=",".join(str(value) for value in DEFAULT_DENIAL_GRID),
+    )
     parser.add_argument(
         "--validated-scorer",
         action="store_true",
