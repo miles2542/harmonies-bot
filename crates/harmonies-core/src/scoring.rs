@@ -72,7 +72,7 @@ fn score_trees(player: &PlayerState) -> i32 {
         .map(|cell| match cell.stack.tokens.as_slice() {
             [Color::Foliage] => 1,
             [Color::Trunk, Color::Foliage] => 3,
-            [Color::Trunk, Color::Trunk, Color::Foliage] => 10,
+            [Color::Trunk, Color::Trunk, Color::Foliage] => 7,
             _ => 0,
         })
         .sum()

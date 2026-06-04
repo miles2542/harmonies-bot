@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Harmonies BGA Snapshot Capture
 // @namespace    harmonies-bga-advisor-local
-// @version      0.1.0
+// @version      0.2.0
 // @description  Read-only Harmonies snapshot capture helper for scorer validation.
 // @match        https://boardgamearena.com/*
 // @match        https://*.boardgamearena.com/*
@@ -10,19 +10,22 @@
 
 (function harmoniesCaptureUserScript() {
   const ROOT_ID = "harmonies-capture-panel";
-  const STORAGE_KEY = "harmonies-bga-capture-latest-v1";
+  const STORAGE_KEY = "harmonies-bga-capture-latest-v2";
+  const DOM_KEY_RE = /(harm|board|cell|hex|token|cube|card|animal|player|score|result)/i;
+  const MAX_DOM_NODES = 2500;
 
   function readPayload() {
     const gamedatas = window.gameui?.gamedatas || null;
     const stored = readStoredPayload();
     return {
-      kind: "harmonies-bga-capture-v1",
+      kind: "harmonies-bga-capture-v2",
       capturedAt: new Date().toISOString(),
       url: window.location.href,
       title: document.title,
       context: readContext(gamedatas),
       scoreHints: readScoreHints(gamedatas),
       visibleScoreText: readVisibleScoreText(),
+      domSnapshot: readDomSnapshot(),
       storedLatest: stored,
       gamedatas,
     };
@@ -99,6 +102,76 @@
         }
       });
     return Array.from(snippets).slice(0, 80);
+  }
+
+  function readDomSnapshot() {
+    const nodes = [];
+    const allNodes = Array.from(document.body?.querySelectorAll("*") || []);
+    for (const node of allNodes) {
+      if (nodes.length >= MAX_DOM_NODES) {
+        break;
+      }
+      const id = node.id || "";
+      const className = stringClassName(node.className);
+      const dataset = readDataset(node);
+      const combined = `${node.tagName} ${id} ${className} ${Object.keys(dataset).join(" ")}`;
+      if (!DOM_KEY_RE.test(combined)) {
+        continue;
+      }
+      nodes.push({
+        tag: node.tagName.toLowerCase(),
+        id,
+        className,
+        dataset,
+        title: node.getAttribute("title") || "",
+        ariaLabel: node.getAttribute("aria-label") || "",
+        style: compactStyle(node.getAttribute("style") || ""),
+        text: readableNodeText(node),
+        rect: readRect(node),
+      });
+    }
+    return {
+      nodeCount: nodes.length,
+      truncated: nodes.length >= MAX_DOM_NODES,
+      nodes,
+    };
+  }
+
+  function stringClassName(value) {
+    if (typeof value === "string") {
+      return value;
+    }
+    return value?.baseVal || "";
+  }
+
+  function readDataset(node) {
+    return Object.fromEntries(
+      Object.entries(node.dataset || {}).filter(([, value]) => String(value).length <= 120),
+    );
+  }
+
+  function compactStyle(style) {
+    return style
+      .split(";")
+      .map((part) => part.trim())
+      .filter((part) => /(?:left|top|transform|background|width|height|display|visibility)/i.test(part))
+      .join("; ")
+      .slice(0, 500);
+  }
+
+  function readableNodeText(node) {
+    const text = compactText(node.textContent || "");
+    return text.length <= 180 ? text : "";
+  }
+
+  function readRect(node) {
+    const rect = node.getBoundingClientRect();
+    return {
+      x: Math.round(rect.x),
+      y: Math.round(rect.y),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    };
   }
 
   function compactText(text) {

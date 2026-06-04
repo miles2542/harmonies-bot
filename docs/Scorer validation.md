@@ -31,6 +31,8 @@ Payload includes:
 - raw `window.gameui.gamedatas`
 - latest live-table `storedLatest.gamedatas` cached in session storage, useful if result page
   `gamedatas` is stale or missing after redirect
+- compact `domSnapshot` of board/card/cube/score/result nodes, useful when the final page visually
+  updates but `window.gameui.gamedatas` lags by one action
 - board side / active player / remaining tokens
 - best-effort `scoreHints` from `gamedatas.players` and score-like DOM nodes
 - best-effort `visibleScoreText` snippets from result/score DOM nodes
@@ -121,3 +123,37 @@ userscript `storedLatest` payload.
     cubes 16 spirit + 0 + 12 + 11 + 16 = 55; total 116.
   - Red/Erin_26/player_2: terrain 10 leaf + 15 field + 15 brick + 5 water = 45;
     cubes 22 spirit + 0 + 10 + 0 + 9 = 41; total 86.
+- Spectate match 5 file `1780551928691` (post-game; screenshot label focused-penguin/erick1nm):
+  - Red/focused-penguin718/player `99949041`: terrain 9 leaf + 13 mountain + 5 water = 27;
+    cubes 10 + 0 + 5 + 4 + 10 + 14 + 16 = 59; total 86.
+  - Blue/erick1nm/player `97666166`: terrain 15 leaf + 17 mountain + 5 brick + 2 water = 39;
+    cubes 12 + 5 + 3 + 3 + 2 + 11 = 36; total 75.
+- Spectate match 6 file `1780551814613` (post-game; screenshot label Sinhtodzau/ausiting01):
+  - Red/Sinhtodzau/player `99878348`: terrain 19 leaf + 10 brick + 5 water = 34;
+    cubes 19 + 5 + 6 + 4 + 15 = 49; total 83.
+  - Green/ausiting01/player `98852546`: terrain 8 leaf + 11 mountain + 5 field + 5 brick + 11 water = 40;
+    cubes 16 + 4 + 10 + 15 = 45; total 85.
+- Spectate match 7 file `1780552026416` (post-game; screenshot label clever-horse/bonjeanski):
+  - Red/clever-horse391/player `97145325`: terrain 24 leaf + 10 field + 2 water = 36;
+    cubes 24 + 0 + 0 + 0 + 0 + 17 + 15 = 56; total 92.
+  - Yellow/bonjeanski/player `84085655`: terrain 9 leaf + 8 mountain + 5 field + 5 brick + 8 water = 35;
+    cubes 18 + 6 + 9 + 14 = 47; total 82.
+
+## New Capture Notes
+
+The v2 capture payloads for matches 5-7 include `storedLatest`, but current and stored states both
+show `gameEnd` for post-game captures. BGA also visually displays the final board/card state on the
+post-game page. Do not assume all post-game board states are stale anymore. Treat each mismatch as an
+open scorer/normalizer bug until proven otherwise.
+
+Current scorer checks against these newer post-game captures:
+
+- `1780551814613` match 6: expected `98852546=85`, `99878348=83`; current scorer `62`, `52`.
+- `1780551928691` match 5: expected `99949041=86`, `97666166=75`; current scorer `78`, `58`.
+- `1780552026416` match 7 after tall-tree fix: expected `97145325=92`, `84085655=82`;
+  current scorer `92`, `67`.
+
+Match 7 is especially useful: red side is exact after tall-tree score was corrected to 7. Yellow
+still misses 15 points; the delta matches one missing final yellow turn (+1 mountain, +5 building,
++3 water, +6 card), and BGA result says yellow `score_aux=7` while captured board has only 6 cubes.
+This points to a capture-state gap for that player, not a confirmed scorer bug.
