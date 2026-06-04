@@ -21,21 +21,26 @@ use axum::{
 use harmonies_core::{
     advise, advise_with_progress_and_cancel, AdvisorRequestV1, CardCatalog, EvalWeights,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Semaphore};
 use tower_http::cors::CorsLayer;
 
 #[derive(Clone)]
 struct AppState {
     catalog: CardCatalog,
     weights: EvalWeights,
+    search_limit: Arc<Semaphore>,
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> anyhow::Result<()> {
     let config = ServiceConfig::from_env();
     let catalog = load_catalog(&config.catalog_path)?;
     let weights = load_weights(&config.weights_path).unwrap_or_default();
-    let state = Arc::new(AppState { catalog, weights });
+    let state = Arc::new(AppState {
+        catalog,
+        weights,
+        search_limit: Arc::new(Semaphore::new(1)),
+    });
     let app = Router::new()
         .route("/health", get(health))
         .route("/advise", post(advise_http))
@@ -64,7 +69,19 @@ async fn advise_http(
 ) -> Json<harmonies_core::AdvisorResponseV1> {
     request.catalog = state.catalog.clone();
     request.weights = state.weights.clone();
-    Json(advise(request))
+    let permit = state
+        .search_limit
+        .clone()
+        .acquire_owned()
+        .await
+        .expect("search semaphore closed");
+    let response = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        advise(request)
+    })
+    .await
+    .expect("advisor worker panicked");
+    Json(response)
 }
 
 async fn advise_ws(
@@ -113,11 +130,18 @@ async fn stream_advice(
     };
     request.catalog = state.catalog.clone();
     request.weights = state.weights.clone();
+    let permit = state
+        .search_limit
+        .clone()
+        .acquire_owned()
+        .await
+        .expect("search semaphore closed");
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
     let progress_tx = tx.clone();
     let cancel = Arc::new(AtomicBool::new(false));
     let worker_cancel = cancel.clone();
     tokio::task::spawn_blocking(move || {
+        let _permit = permit;
         let final_response = advise_with_progress_and_cancel(
             request,
             |response| {

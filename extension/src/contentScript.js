@@ -4,9 +4,14 @@
 
   const overlay = window.HarmoniesAdvisorOverlay.createOverlay();
   const advisorClient = window.HarmoniesAdvisorClient.createAdvisorClient();
+  let isAnalyzing = false;
+  let activeStateKey = "";
+  let completedStateKey = "";
+  let stoppedStateKey = "";
   overlay.onStop(() => {
+    stoppedStateKey = activeStateKey;
     advisorClient.stop();
-    overlay.setStatus("Stopping search");
+    overlay.setStatus(isAnalyzing ? "Stopping search" : "Search stopped; waiting for state change");
   });
 
   function injectPageBridge() {
@@ -56,12 +61,85 @@
       return;
     }
 
-    overlay.setStatus("Analyzing visible state");
     const playerId = getCurrentPlayerId(gamedatas, payload);
-    const response = await advisorClient.getRecommendation(gamedatas, (partialResponse) => {
-      overlay.renderRecommendation(partialResponse);
-    }, playerId);
-    overlay.renderRecommendation(response);
+    const stateKey = buildStateKey(gamedatas, playerId);
+    if (!stateKey) {
+      overlay.setStatus("Waiting for complete table state");
+      return;
+    }
+    if (isAnalyzing || stateKey === completedStateKey) {
+      return;
+    }
+    if (stateKey === stoppedStateKey) {
+      overlay.setStatus("Search stopped; waiting for state change");
+      return;
+    }
+
+    isAnalyzing = true;
+    activeStateKey = stateKey;
+    overlay.setStatus("Analyzing visible state");
+    try {
+      const response = await advisorClient.getRecommendation(gamedatas, (partialResponse) => {
+        if (activeStateKey === stateKey) {
+          overlay.renderRecommendation(partialResponse);
+        }
+      }, playerId);
+      if (activeStateKey === stateKey) {
+        overlay.renderRecommendation(response);
+        completedStateKey = stateKey;
+      }
+    } finally {
+      if (activeStateKey === stateKey) {
+        isAnalyzing = false;
+      }
+    }
+  }
+
+  function buildStateKey(gamedatas, playerId) {
+    const player = gamedatas?.players?.[playerId];
+    if (!player) {
+      return "";
+    }
+    return JSON.stringify({
+      playerId,
+      activePlayer: gamedatas?.gamestate?.active_player || "",
+      stateName: gamedatas?.gamestate?.name || "",
+      remainingTokens: gamedatas?.remainingTokens ?? null,
+      central: compactCentralGroups(gamedatas?.tokensOnCentralBoard),
+      river: compactCards(gamedatas?.river),
+      spirits: compactCards(gamedatas?.spiritsCards),
+      boardCards: compactCards(player.boardAnimalCards),
+      doneCards: compactCards(player.doneAnimalCards),
+      tokensOnBoard: player.tokensOnBoard || {},
+      animalCubesOnBoard: player.animalCubesOnBoard || {},
+      cubesOnAnimalCards: gamedatas?.cubesOnAnimalCards || {},
+      emptyHexes: player.emptyHexes ?? null,
+    });
+  }
+
+  function compactCentralGroups(groups) {
+    return Object.entries(groups || {})
+      .sort(([left], [right]) => Number.parseInt(left, 10) - Number.parseInt(right, 10))
+      .map(([key, tokens]) => [key, compactTokens(tokens)]);
+  }
+
+  function compactTokens(tokens) {
+    return (Array.isArray(tokens) ? tokens : []).map((token) => [
+      token?.id ?? null,
+      token?.type_arg ?? null,
+      token?.location ?? null,
+      token?.location_arg ?? null,
+    ]);
+  }
+
+  function compactCards(cards) {
+    return (Array.isArray(cards) ? cards : []).map((card) => [
+      card?.id ?? null,
+      card?.type_arg ?? null,
+      card?.location ?? null,
+      card?.location_arg ?? null,
+      card?.isSpirit ?? null,
+    ]);
   }
 
   window.addEventListener("message", (event) => {
