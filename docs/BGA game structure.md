@@ -48,10 +48,11 @@ Card `type_arg` corresponds to the design ID in the catalog, matching layout pos
 * Cell keys in JS model: `cell_[playerId]_[col]_[row]` (e.g. `cell_99795824_2_2`).
 * Board Side A vs B determined by `gamedatas.boardSide` (`"sideA"` or `"sideB"`).
 * Board coordinate schema defined in `gamedatas.hexes` as a list of `{ col, row }` coordinates.
-* **Hex adjacency rule (odd-r layout):**
-  * Neighbors of hex `(col, row)` depend on whether `row` is even or odd.
-  * Even row neighbors: `(c-1, r-1)`, `(c, r-1)`, `(c-1, r)`, `(c+1, r)`, `(c-1, r+1)`, `(c, r+1)`
-  * Odd row neighbors: `(c, r-1)`, `(c+1, r-1)`, `(c-1, r)`, `(c+1, r)`, `(c, r+1)`, `(c+1, r+1)`
+* **Hex adjacency rule (odd-q / column-offset layout):**
+  * Neighbors of hex `(col, row)` depend on whether `col` is even or odd.
+  * Even column neighbors: `(c+1, r)`, `(c+1, r-1)`, `(c, r-1)`, `(c-1, r-1)`, `(c-1, r)`, `(c, r+1)`
+  * Odd column neighbors: `(c+1, r+1)`, `(c+1, r)`, `(c, r-1)`, `(c-1, r)`, `(c-1, r+1)`, `(c, r+1)`
+  * This was verified from BGA DOM cell centers in a Side A post-game capture. Earlier odd-r notes were wrong and caused field/water scoring misses.
 
 ### 2. Token Stacking representation
 Inside `tokensOnBoard[cell_key]`, tokens are ordered in a list representing the stack bottom-to-top.
@@ -76,7 +77,7 @@ Inside `tokensOnBoard[cell_key]`, tokens are ordered in a list representing the 
 * The shape is built as a **relative path chain**:
   * **Step 0 (index 0):** The start coordinate of the pattern. `position` is always `0` (represents base offset `(0,0)`).
   * **Step N (index > 0):** `position` values (`0` to `5`) represent the direction offset relative to the **previous step's** hex in the list.
-* Direction indices `0` to `5` map to neighbors depending on whether the current step's row is even or odd (standard odd-r grid offsets).
+* Direction indices `0` to `5` map to neighbors depending on whether the current step's column is even or odd (odd-q column offsets).
   * Example pattern containing duplicate `position: 3` values (e.g. `[Step 0 (pos 0), Step 1 (pos 3), Step 2 (pos 3)]`) forms a straight-line sequence of 3 hexes (Start -> Neighbor 3 -> Neighbor 3 of Step 1).
 
 

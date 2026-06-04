@@ -67,6 +67,13 @@ If BGA result data is present in `gamedatas.gamestate.args.result`:
 python -m tools.score_qa temp\snapshots\final-capture.json --use-bga-result
 ```
 
+If a result-page capture has no `gamedatas` but has `domSnapshot`, convert the visible DOM first:
+
+```powershell
+python -m tools.dom_capture_to_snapshot temp\snapshots\final-capture.json --out temp\normalized-final-dom.json
+python -m tools.score_qa temp\normalized-final-dom.json --expected 96117860=116 --expected 85751928=113
+```
+
 Pass means engine totals match expected BGA totals for listed players. Fail means scorer or
 normalizer needs investigation before training.
 
@@ -148,12 +155,25 @@ open scorer/normalizer bug until proven otherwise.
 
 Current scorer checks against these newer post-game captures:
 
-- `1780551814613` match 6: expected `98852546=85`, `99878348=83`; current scorer `62`, `52`.
-- `1780551928691` match 5: expected `99949041=86`, `97666166=75`; current scorer `78`, `58`.
+- `1780551814613` match 6 after odd-q geometry + Spirit 36 fixes: expected `98852546=85`,
+  `99878348=83`; current scorer `59`, `46`. Both players have `score_aux` / captured cube-count
+  mismatches.
+- `1780551928691` match 5 after odd-q geometry + Spirit 36 fixes: expected `99949041=86`,
+  `97666166=75`; current scorer `83`, `55`. Blue has `score_aux` / captured cube-count mismatch.
 - `1780552026416` match 7 after tall-tree fix: expected `97145325=92`, `84085655=82`;
-  current scorer `92`, `67`.
+  current scorer `92`, `76`.
 
-Match 7 is especially useful: red side is exact after tall-tree score was corrected to 7. Yellow
-still misses 15 points; the delta matches one missing final yellow turn (+1 mountain, +5 building,
-+3 water, +6 card), and BGA result says yellow `score_aux=7` while captured board has only 6 cubes.
-This points to a capture-state gap for that player, not a confirmed scorer bug.
+Match 7 is useful: red side is exact after tall-tree score was corrected to 7. After odd-q geometry,
+yellow terrain also matches BGA, but the player still misses 6 card points because BGA result says
+yellow `score_aux=7` while captured board has only 6 cubes. This points to a capture-state gap for
+that player, not a confirmed scorer bug.
+
+- Spectate match 8 file `1780554171467` (post-game DOM-only capture; no `gamedatas` or
+  `storedLatest`):
+  - Green/Pezonloc0/player `96117860`: terrain 12 leaf + 21 mountain + 10 field + 10 brick +
+    19 water = 72; cubes 14 spirit card 42 + 5 + 0 + 13 + 12 = 44; total 116.
+  - Red/Emilie91180/player `85751928`: terrain 18 leaf + 14 mountain + 15 field + 10 brick +
+    11 water = 68; cubes 16 spirit card 36 + 6 + 10 + 13 = 45; total 113.
+  - DOM converter parity passes exactly after two fixes:
+    - BGA coordinates use odd-q column offsets, not odd-r row offsets.
+    - Spirit 36 scores 3 points for trees of height 1 or 2, and 1 point for height 3.

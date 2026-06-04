@@ -5,20 +5,20 @@ use crate::model::Coord;
 pub const DIRECTIONS: usize = 6;
 
 pub fn neighbor(coord: Coord, direction: usize) -> Coord {
-    let even = coord.row % 2 == 0;
+    let even = coord.col % 2 == 0;
     let (dc, dr) = match (even, direction) {
-        (true, 0) => (-1, -1),
-        (true, 1) => (0, -1),
-        (true, 2) => (-1, 0),
-        (true, 3) => (1, 0),
-        (true, 4) => (-1, 1),
+        (true, 0) => (1, 0),
+        (true, 1) => (1, -1),
+        (true, 2) => (0, -1),
+        (true, 3) => (-1, -1),
+        (true, 4) => (-1, 0),
         (true, 5) => (0, 1),
-        (false, 0) => (0, -1),
-        (false, 1) => (1, -1),
-        (false, 2) => (-1, 0),
-        (false, 3) => (1, 0),
-        (false, 4) => (0, 1),
-        (false, 5) => (1, 1),
+        (false, 0) => (1, 1),
+        (false, 1) => (1, 0),
+        (false, 2) => (0, -1),
+        (false, 3) => (-1, 0),
+        (false, 4) => (-1, 1),
+        (false, 5) => (0, 1),
         _ => unreachable!("direction bounded by caller"),
     };
     Coord {
@@ -73,14 +73,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn odd_r_neighbors_match_bga_notes() {
+    fn odd_q_neighbors_match_bga_dom_layout() {
         assert_eq!(
-            neighbor(Coord { col: 2, row: 2 }, 0),
-            Coord { col: 1, row: 1 }
+            neighbors(Coord { col: 2, row: 2 }),
+            [
+                Coord { col: 3, row: 2 },
+                Coord { col: 3, row: 1 },
+                Coord { col: 2, row: 1 },
+                Coord { col: 1, row: 1 },
+                Coord { col: 1, row: 2 },
+                Coord { col: 2, row: 3 },
+            ]
         );
         assert_eq!(
-            neighbor(Coord { col: 2, row: 3 }, 0),
-            Coord { col: 2, row: 2 }
+            neighbors(Coord { col: 3, row: 2 }),
+            [
+                Coord { col: 4, row: 3 },
+                Coord { col: 4, row: 2 },
+                Coord { col: 3, row: 1 },
+                Coord { col: 2, row: 2 },
+                Coord { col: 2, row: 3 },
+                Coord { col: 3, row: 3 },
+            ]
         );
     }
 }

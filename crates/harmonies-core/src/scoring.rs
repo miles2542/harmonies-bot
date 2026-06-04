@@ -169,7 +169,7 @@ fn score_spirit_logic(player: &PlayerState, type_arg: u8) -> i32 {
         33 => score_color_groups(player, Color::Field, |size| if size >= 3 { 10 } else { 2 }),
         34 => score_color_groups(player, Color::Field, |_| 5),
         35 => count_tree_heights(player, &[2, 3]) * 4,
-        36 => count_tree_heights(player, &[1, 2]) * 3 + count_tree_heights(player, &[3]) * 4,
+        36 => count_tree_heights(player, &[1, 2]) * 3 + count_tree_heights(player, &[3]),
         37 => score_color_groups(player, Color::Building, |_| 4),
         38 => score_color_groups(
             player,

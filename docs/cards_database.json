@@ -354,7 +354,7 @@
       {"colors": [4], "position": 5, "allowCube": false}
     ],
     "isSpirit": true,
-    "spiritScoringLogic": "Gain 3 points for each tree of height 1 or 2, 4 points for each tree of height 3"
+    "spiritScoringLogic": "Gain 3 points for each tree of height 1 or 2, 1 point for each tree of height 3"
   },
   "37": {
     "type_arg": 37,

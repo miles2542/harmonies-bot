@@ -75,6 +75,18 @@ fn fields_score_each_connected_group_of_two_or_more_once() {
 }
 
 #[test]
+fn fields_use_bga_column_offset_adjacency() {
+    let player = player(vec![
+        cell(3, 2, vec![Color::Field]),
+        cell(4, 3, vec![Color::Field]),
+    ]);
+    assert_eq!(
+        score_player(&player, BoardSide::SideA, &CardCatalog::default()).fields,
+        5
+    );
+}
+
+#[test]
 fn building_needs_three_distinct_adjacent_top_colors() {
     let player = player(vec![
         cell(0, 0, vec![Color::Mountain, Color::Building]),
@@ -105,6 +117,23 @@ fn side_a_river_uses_longest_path_not_all_branching_water() {
     assert_eq!(
         score_player(&player, BoardSide::SideA, &CardCatalog::default()).water,
         11
+    );
+}
+
+#[test]
+fn side_a_river_uses_bga_column_offset_adjacency() {
+    let player = player(vec![
+        cell(1, 0, vec![Color::Water]),
+        cell(0, 1, vec![Color::Water]),
+        cell(0, 2, vec![Color::Water]),
+        cell(0, 3, vec![Color::Water]),
+        cell(1, 3, vec![Color::Water]),
+        cell(3, 3, vec![Color::Water]),
+        cell(2, 4, vec![Color::Water]),
+    ]);
+    assert_eq!(
+        score_player(&player, BoardSide::SideA, &CardCatalog::default()).water,
+        19
     );
 }
 
@@ -148,4 +177,37 @@ fn completed_spirit_scores() {
         is_spirit: true,
     });
     assert_eq!(score_player(&player, BoardSide::SideA, &catalog).spirits, 4);
+}
+
+#[test]
+fn spirit_36_scores_short_trees_at_three_and_tall_trees_at_one() {
+    let mut catalog = CardCatalog::default();
+    catalog.cards.insert(
+        36,
+        CardDefinition {
+            type_arg: 36,
+            point_locations: vec![0],
+            pattern: Vec::new(),
+            is_spirit: true,
+            spirit_scoring_logic: None,
+        },
+    );
+    let mut player = player(vec![
+        cell(0, 0, vec![Color::Foliage]),
+        cell(1, 0, vec![Color::Foliage]),
+        cell(2, 0, vec![Color::Trunk, Color::Foliage]),
+        cell(3, 0, vec![Color::Trunk, Color::Foliage]),
+        cell(4, 0, vec![Color::Trunk, Color::Foliage]),
+        cell(0, 1, vec![Color::Trunk, Color::Trunk, Color::Foliage]),
+    ]);
+    player.completed_cards.push(ActiveCard {
+        card_id: 1,
+        type_arg: 36,
+        remaining_cubes: 0,
+        is_spirit: true,
+    });
+    assert_eq!(
+        score_player(&player, BoardSide::SideA, &catalog).spirits,
+        16
+    );
 }
