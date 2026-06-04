@@ -3,8 +3,12 @@
 Primary target: 2-player Side A, Nature Spirit enabled.
 
 Do not run self-play tuning until scorer parity passes against Side A 2p BGA final-score fixtures.
-Minimum gate: one final/post-game fixture with exact BGA totals. Better gate: 3-5 finals covering
-high/low river use, several completed animal cards, and at least one Spirit card score.
+Current gate: five tracked Side A 2p Nature Spirit BGA finals in `fixtures/score_parity`, covering
+high/low river use, completed animal cards, and Spirit scores.
+
+```powershell
+python -m tools.score_fixture_corpus
+```
 
 ## Current Weight Schema
 
@@ -31,7 +35,7 @@ Utility:
 python -m tools.train_weights --out temp\training\weight_candidates.jsonl
 ```
 
-After scorer parity passes:
+After fixture corpus passes:
 
 ```powershell
 python -m tools.train_weights --validated-scorer --out temp\training\weight_candidates.jsonl
@@ -53,7 +57,7 @@ cargo run -q -p harmonies-cli -- self-play snapshots\raw\side-a-near-end.json `
   --turn-budget-ms 250
 ```
 
-After scorer parity passes, add `--validated-scorer` and raise turn budget / turn cap for tuning.
+After fixture corpus passes, add `--validated-scorer` and raise turn budget / turn cap for tuning.
 
 ## Later Training Plan
 

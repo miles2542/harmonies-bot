@@ -43,12 +43,12 @@
 - Extension read-only safety checker now scans JS, local endpoints, and manifest permissions.
 - Rust self-play simulator can replay from raw/normalized BGA snapshots and apply advisor plans with
   token/card refills for smoke testing and future tuning.
+- Tracked scorer parity corpus exists in `fixtures/score_parity`: five anonymized Side A 2p Nature
+  Spirit BGA finals with exact expected totals. Run with `python -m tools.score_fixture_corpus`.
 
 ## Known Gaps
 
-- Need committed anonymized fixture corpus, not just ignored local `temp/` captures.
-- Need fixture set listed in [Snapshot QA](./Snapshot%20QA.md).
-- Need committed anonymized Side A 2p final-score fixture corpus before training/tuning.
+- Need broader fixture set listed in [Snapshot QA](./Snapshot%20QA.md) beyond final-score parity.
 - Need more settlement-available active-turn fixtures if BGA exposes edge cases, but match 12 already
   covers early Spirit choice plus late active-turn search smoke.
 - CMA-ES evaluator still pending; self-play exists as gated smoke/tuning plumbing, not validated

@@ -16,6 +16,7 @@ python tools\snapshot_qa.py snapshots\raw\turn.json snapshots\normalized\turn.js
 python tools\snapshot_qa.py --json --compare snapshots\raw\turn.json snapshots\normalized\turn.json
 python -m tools.score_qa snapshots\raw\final.json --expected player_1=84 --expected player_2=79
 python -m tools.score_qa snapshots\raw\final-capture.json --use-capture-scores
+python -m tools.score_fixture_corpus
 ```
 
 Default output is human-readable. `--json` output is intended for fixture logs and `jq`.
@@ -50,6 +51,8 @@ python tools\snapshot_anonymizer.py snapshots\raw\turn.json snapshots\raw\turn.a
 - Do not commit personal names, avatars, table IDs, chat, or unrelated BGA payload.
 - For final-score parity, record BGA final totals manually if capture `scoreHints` are empty or use
   BGA numeric ids that do not match normalized/anonymized player ids.
+- Tracked final-score parity fixtures live in `fixtures\score_parity\`. Keep them anonymized,
+  normalized `GameSnapshotV1` files with expected totals in `manifest.json`.
 
 ## Required Fixture Types
 

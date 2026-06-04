@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "name": "sidea_2p_nature_match08_dom_final",
+      "snapshot": "sidea_2p_nature_match08_dom_final.json",
+      "expected": {
+        "player_1": 116,
+        "player_2": 113
+      }
+    },
+    {
+      "name": "sidea_2p_nature_match09_dom_final",
+      "snapshot": "sidea_2p_nature_match09_dom_final.json",
+      "expected": {
+        "player_1": 104,
+        "player_2": 88
+      }
+    },
+    {
+      "name": "sidea_2p_nature_match10_dom_final",
+      "snapshot": "sidea_2p_nature_match10_dom_final.json",
+      "expected": {
+        "player_1": 96,
+        "player_2": 104
+      }
+    },
+    {
+      "name": "sidea_2p_nature_match11_dom_final",
+      "snapshot": "sidea_2p_nature_match11_dom_final.json",
+      "expected": {
+        "player_1": 69,
+        "player_2": 117
+      }
+    },
+    {
+      "name": "sidea_2p_nature_match12_dom_final",
+      "snapshot": "sidea_2p_nature_match12_dom_final.json",
+      "expected": {
+        "player_1": 70,
+        "player_2": 60
+      }
+    }
+  ]
+}
