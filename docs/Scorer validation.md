@@ -37,6 +37,10 @@ Payload includes:
 - best-effort `scoreHints` from `gamedatas.players` and score-like DOM nodes
 - best-effort `visibleScoreText` snippets from result/score DOM nodes
 
+ScriptCat/Tampermonkey run userscripts in a sandbox. The capture helper reads
+`unsafeWindow.gameui.gamedatas` when available; if `context.playerCount` is `0` and `gamedatas` is
+`null`, reinstall/update the userscript before collecting active-turn parser fixtures.
+
 ## Score Command
 
 ```powershell
@@ -195,10 +199,24 @@ that player, not a confirmed scorer bug.
     - A scoring Building landscape requires Red on Red/Brown/Grey plus 3 adjacent top colors.
     - Single Red is legal terrain but scores 0 in the Building category.
 
+- Real participant match 11 files `1780578391146` near-end and `1780578551792` post-game
+  (DOM-only captures; same table):
+  - Green/__bunny/player `98885479`: terrain 17 leaf + 15 brick + 2 water = 34;
+    cubes 4 + 2 + 9 + 5 + 0 + 15 = 35; total 69.
+  - Red/bbyuri/player `99922119`: terrain 15 leaf + 13 mountain + 10 field +
+    19 water = 57; cubes 14 + 10 + 10 + 5 + 9 + 12 = 60; total 117.
+  - DOM converter parity passes exactly after accepting on-board token ids shaped `token-*`
+    as well as `tokenOnBoard_*`.
+  - Post-game own-board token classes may include multiple `level-*` classes; stack order uses the
+    last `level-*` class.
+  - Near-end DOM normalizes and returns advisor plans, but it has no `gamedatas` and no river-card
+    display. Use updated capture helper for active-turn raw parser/search validation.
+
 Current exact parity gate:
 
 ```powershell
 python -m tools.score_qa temp\normalized-match8-dom.json --expected 96117860=116 --expected 85751928=113
 python -m tools.score_qa temp\normalized-match9-dom.json --expected 98816549=104 --expected 85116272=88
 python -m tools.score_qa temp\normalized-match10-dom.json --expected 99809470=96 --expected 95645953=104
+python -m tools.score_qa temp\normalized-real-bunny-postgame-dom.json --expected 98885479=69 --expected 99922119=117
 ```

@@ -6,6 +6,7 @@
 // @match        https://boardgamearena.com/*
 // @match        https://*.boardgamearena.com/*
 // @grant        GM_setClipboard
+// @grant        unsafeWindow
 // ==/UserScript==
 
 (function harmoniesCaptureUserScript() {
@@ -15,7 +16,7 @@
   const MAX_DOM_NODES = 2500;
 
   function readPayload() {
-    const gamedatas = window.gameui?.gamedatas || null;
+    const gamedatas = readGamedatas();
     const stored = readStoredPayload();
     return {
       kind: "harmonies-bga-capture-v2",
@@ -32,7 +33,7 @@
   }
 
   function rememberLatestGamedatas() {
-    const gamedatas = window.gameui?.gamedatas || null;
+    const gamedatas = readGamedatas();
     if (!gamedatas) {
       return;
     }
@@ -57,6 +58,17 @@
     } catch (_error) {
       return null;
     }
+  }
+
+  function readPageWindow() {
+    if (typeof unsafeWindow !== "undefined" && unsafeWindow) {
+      return unsafeWindow;
+    }
+    return window;
+  }
+
+  function readGamedatas() {
+    return readPageWindow().gameui?.gamedatas || null;
   }
 
   function readContext(gamedatas) {

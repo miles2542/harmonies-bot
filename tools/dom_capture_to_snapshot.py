@@ -113,8 +113,8 @@ def parse_color(class_name: str) -> str | None:
 
 
 def parse_level(class_name: str) -> int:
-    match = LEVEL_RE.search(class_name)
-    return int(match.group(1)) if match else 1
+    matches = LEVEL_RE.findall(class_name)
+    return int(matches[-1]) if matches else 1
 
 
 def read_nodes(path: Path) -> list[DomNode]:
@@ -177,7 +177,7 @@ def cell_sort_key(node_id: str) -> tuple[int, int]:
 def tokens_in_cell(nodes: list[DomNode], cell: DomNode) -> list[str]:
     stacked = []
     for node in nodes:
-        if "colored-token" not in node.class_name or not node.node_id.startswith("tokenOnBoard_"):
+        if "colored-token" not in node.class_name:
             continue
         if not center_inside(cell.rect, node.rect):
             continue
