@@ -10,9 +10,11 @@
 
 (function harmoniesCaptureUserScript() {
   const ROOT_ID = "harmonies-capture-panel";
+  const STORAGE_KEY = "harmonies-bga-capture-latest-v1";
 
   function readPayload() {
     const gamedatas = window.gameui?.gamedatas || null;
+    const stored = readStoredPayload();
     return {
       kind: "harmonies-bga-capture-v1",
       capturedAt: new Date().toISOString(),
@@ -20,8 +22,38 @@
       title: document.title,
       context: readContext(gamedatas),
       scoreHints: readScoreHints(gamedatas),
+      visibleScoreText: readVisibleScoreText(),
+      storedLatest: stored,
       gamedatas,
     };
+  }
+
+  function rememberLatestGamedatas() {
+    const gamedatas = window.gameui?.gamedatas || null;
+    if (!gamedatas) {
+      return;
+    }
+    const payload = {
+      storedAt: new Date().toISOString(),
+      url: window.location.href,
+      title: document.title,
+      context: readContext(gamedatas),
+      gamedatas,
+    };
+    try {
+      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch (_error) {
+      // Best-effort cache only. Capture should still work if storage quota blocks us.
+    }
+  }
+
+  function readStoredPayload() {
+    try {
+      const raw = window.sessionStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_error) {
+      return null;
+    }
   }
 
   function readContext(gamedatas) {
@@ -54,6 +86,23 @@
     return Array.from(hints.values()).sort((left, right) =>
       left.playerId.localeCompare(right.playerId),
     );
+  }
+
+  function readVisibleScoreText() {
+    const snippets = new Set();
+    document
+      .querySelectorAll("[id*='score'], [class*='score'], [id*='result'], [class*='result']")
+      .forEach((node) => {
+        const text = compactText(node.textContent || "");
+        if (text.length >= 2 && text.length <= 240) {
+          snippets.add(text);
+        }
+      });
+    return Array.from(snippets).slice(0, 80);
+  }
+
+  function compactText(text) {
+    return text.replace(/\s+/g, " ").trim();
   }
 
   function addHint(hints, playerId, rawTotal, source) {
@@ -136,6 +185,10 @@
     root.querySelector("[data-role='status']").textContent = message;
   }
 
-  window.setInterval(installPanel, 1000);
+  window.setInterval(() => {
+    rememberLatestGamedatas();
+    installPanel();
+  }, 1000);
+  rememberLatestGamedatas();
   installPanel();
 })();

@@ -287,7 +287,12 @@ fn parse_cards(
                 remaining_cubes: if completed {
                     0
                 } else {
-                    remaining_cubes_for_active_card(card, card_id, cube_counts)
+                    cube_counts.get(&card_id).copied().unwrap_or_else(|| {
+                        card.get("pointLocations")
+                            .and_then(Value::as_array)
+                            .map(|points| points.len() as u8)
+                            .unwrap_or(0)
+                    })
                 },
                 is_spirit: card
                     .get("isSpirit")
@@ -296,27 +301,6 @@ fn parse_cards(
             })
         })
         .collect()
-}
-
-fn remaining_cubes_for_active_card(
-    card: &Value,
-    card_id: u32,
-    cube_counts: &HashMap<u32, u8>,
-) -> u8 {
-    let total = card
-        .get("pointLocations")
-        .and_then(Value::as_array)
-        .map(|points| points.len() as u8)
-        .unwrap_or(0);
-    let placed = card
-        .get("location_arg")
-        .and_then(Value::as_u64)
-        .map(|value| value.min(u8::MAX as u64) as u8)
-        .unwrap_or(0);
-    if placed > 0 {
-        return total.saturating_sub(placed);
-    }
-    cube_counts.get(&card_id).copied().unwrap_or(total)
 }
 
 fn parse_player_spirits(

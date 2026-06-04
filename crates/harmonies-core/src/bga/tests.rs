@@ -213,7 +213,7 @@ fn player_location_ids_override_conflicting_player_order() {
 }
 
 #[test]
-fn active_card_location_arg_tracks_placed_cubes() {
+fn active_card_remaining_cubes_come_from_card_cube_locations() {
     let raw = json!({
         "version": "230603",
         "boardSide": "sideA",
@@ -239,5 +239,5 @@ fn active_card_location_arg_tracks_placed_cubes() {
         ]
     });
     let snapshot = normalize_gamedatas(&raw, Some("p1")).unwrap();
-    assert_eq!(snapshot.players[0].active_cards[0].remaining_cubes, 1);
+    assert_eq!(snapshot.players[0].active_cards[0].remaining_cubes, 3);
 }

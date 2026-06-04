@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use serde::{Deserialize, Serialize};
 
@@ -136,7 +136,7 @@ fn score_water(player: &PlayerState, board_side: BoardSide) -> i32 {
         .map(|cell| cell.coord)
         .collect();
     match board_side {
-        BoardSide::SideA => river_score(longest_water_path(&water)),
+        BoardSide::SideA => river_score(longest_shortest_water_path(&water)),
         BoardSide::SideB => {
             let land: HashSet<Coord> = player
                 .cells
@@ -200,27 +200,27 @@ fn is_mountain_stack(cell: &Cell) -> bool {
             .all(|token| *token == Color::Mountain)
 }
 
-fn longest_water_path(water: &HashSet<Coord>) -> usize {
-    fn dfs(current: Coord, water: &HashSet<Coord>, seen: &mut HashSet<Coord>) -> usize {
-        seen.insert(current);
-        let next_steps: Vec<Coord> = neighbors(current)
-            .into_iter()
-            .filter(|next| water.contains(next) && !seen.contains(next))
-            .collect();
-        let best = next_steps
-            .into_iter()
-            .map(|next| dfs(next, water, seen))
-            .max()
-            .unwrap_or(0);
-        seen.remove(&current);
-        best + 1
-    }
-
+fn longest_shortest_water_path(water: &HashSet<Coord>) -> usize {
     water
         .iter()
-        .map(|start| dfs(*start, water, &mut HashSet::new()))
+        .map(|start| farthest_shortest_path(*start, water))
         .max()
         .unwrap_or(0)
+}
+
+fn farthest_shortest_path(start: Coord, water: &HashSet<Coord>) -> usize {
+    let mut queue = VecDeque::from([(start, 1usize)]);
+    let mut seen = HashSet::from([start]);
+    let mut farthest = 1;
+    while let Some((coord, distance)) = queue.pop_front() {
+        farthest = farthest.max(distance);
+        for next in neighbors(coord) {
+            if water.contains(&next) && seen.insert(next) {
+                queue.push_back((next, distance + 1));
+            }
+        }
+    }
+    farthest
 }
 
 fn river_score(length: usize) -> i32 {
