@@ -25,12 +25,21 @@
     return name.includes("harmonies") || Boolean(gamedatas?.tokensOnCentralBoard);
   }
 
-  function getCurrentPlayerId(gamedatas) {
-    return String(gamedatas?.player_id || gamedatas?.current_player_id || "");
+  function getCurrentPlayerId(gamedatas, payload) {
+    return String(
+      payload?.currentPlayerId ||
+        gamedatas?.player_id ||
+        gamedatas?.current_player_id ||
+        gamedatas?.gamestate?.active_player ||
+        "",
+    );
   }
 
-  function isActiveParticipant(gamedatas) {
-    const playerId = getCurrentPlayerId(gamedatas);
+  function isActiveParticipant(gamedatas, payload) {
+    if (payload?.isSpectator) {
+      return false;
+    }
+    const playerId = getCurrentPlayerId(gamedatas, payload);
     const players = gamedatas?.players || {};
     return Boolean(playerId && players[playerId]);
   }
@@ -41,15 +50,17 @@
       overlay.setStatus("Waiting for Harmonies table");
       return;
     }
-    if (!isActiveParticipant(gamedatas)) {
-      overlay.setStatus("Participant not detected");
+    if (!isActiveParticipant(gamedatas, payload)) {
+      const detected = getCurrentPlayerId(gamedatas, payload) || "none";
+      overlay.setStatus(`Participant not detected; player ${detected}`);
       return;
     }
 
     overlay.setStatus("Analyzing visible state");
+    const playerId = getCurrentPlayerId(gamedatas, payload);
     const response = await advisorClient.getRecommendation(gamedatas, (partialResponse) => {
       overlay.renderRecommendation(partialResponse);
-    });
+    }, playerId);
     overlay.renderRecommendation(response);
   }
 

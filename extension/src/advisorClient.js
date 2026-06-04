@@ -14,8 +14,11 @@
 
   function createAdvisorClient() {
     return {
-      async getRecommendation(gamedatas, onUpdate) {
-        const snapshot = window.HarmoniesBgaNormalizer.normalizeGamedatas(gamedatas);
+      async getRecommendation(gamedatas, onUpdate, perspectivePlayerId) {
+        const snapshot = window.HarmoniesBgaNormalizer.normalizeGamedatas(
+          gamedatas,
+          perspectivePlayerId,
+        );
         try {
           const response = await requestNativeAdvisor(snapshot, (partialResponse) => {
             if (onUpdate) {

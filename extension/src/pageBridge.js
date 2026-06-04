@@ -10,8 +10,21 @@
     return {
       capturedAt: new Date().toISOString(),
       locationHref: window.location.href,
+      currentPlayerId: readCurrentPlayerId(gameui),
+      isSpectator: Boolean(gameui.isSpectator || gameui.is_spectator),
       gamedatas: gameui.gamedatas,
     };
+  }
+
+  function readCurrentPlayerId(gameui) {
+    const candidates = [
+      gameui.player_id,
+      gameui.current_player_id,
+      gameui.currentPlayerId,
+      gameui.gamedatas?.player_id,
+      gameui.gamedatas?.current_player_id,
+    ];
+    return String(candidates.find((value) => value !== undefined && value !== null) || "");
   }
 
   function publishState() {
