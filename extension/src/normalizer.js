@@ -11,7 +11,6 @@
 
   const TODO_GAPS = [
     "No parity tests against Rust normalizer yet.",
-    "Spirit-card ownership support kept minimal; depends on observed spiritsCards shape.",
     "Card pattern/catalog details omitted because GameSnapshotV1 only needs card ids, type args, cube counts.",
   ];
 
@@ -70,11 +69,13 @@
     });
     const activeCards = parseCards(player.boardAnimalCards, cardCubeCounts, false);
     activeCards.push(...parsePlayerSpirits(gamedatas.spiritsCards, playerId, cardCubeCounts));
+    const spiritCardChoices = parsePlayerSpiritChoices(gamedatas.spiritsCards, playerId, cardCubeCounts);
 
     return {
       playerId,
       cells,
       activeCards,
+      spiritCardChoices,
       completedCards: parseCards(player.doneAnimalCards, cardCubeCounts, true),
       emptyHexes: clampU8(numberValue(player.emptyHexes) || 0),
     };
@@ -232,13 +233,32 @@
       .map((card) => {
         const cardId = numberValue(card.id);
         const typeArg = numberValue(card.type_arg);
-        if (!Number.isFinite(cardId) || !Number.isFinite(typeArg)) {
+        if (!Number.isFinite(cardId) || !Number.isFinite(typeArg) || !cubeCounts.has(cardId)) {
           return null;
         }
         return {
           cardId,
           typeArg,
-          remainingCubes: cubeCounts.get(cardId) || 1,
+          remainingCubes: cubeCounts.get(cardId),
+          isSpirit: true,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function parsePlayerSpiritChoices(value, playerId, cubeCounts) {
+    return arrayValue(value)
+      .filter((card) => String(card.location_arg) === playerId)
+      .map((card) => {
+        const cardId = numberValue(card.id);
+        const typeArg = numberValue(card.type_arg);
+        if (!Number.isFinite(cardId) || !Number.isFinite(typeArg) || cubeCounts.has(cardId)) {
+          return null;
+        }
+        return {
+          cardId,
+          typeArg,
+          remainingCubes: 1,
           isSpirit: true,
         };
       })

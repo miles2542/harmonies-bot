@@ -126,6 +126,8 @@ pub struct PlayerState {
     pub player_id: String,
     pub cells: Vec<Cell>,
     pub active_cards: Vec<ActiveCard>,
+    #[serde(default)]
+    pub spirit_card_choices: Vec<ActiveCard>,
     pub completed_cards: Vec<ActiveCard>,
     pub empty_hexes: u8,
 }

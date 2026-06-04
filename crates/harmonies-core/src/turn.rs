@@ -22,6 +22,10 @@ pub enum TurnStep {
         card_id: u32,
         type_arg: u8,
     },
+    ChooseSpirit {
+        card_id: u32,
+        type_arg: u8,
+    },
     SettleCard {
         card_id: u32,
         type_arg: u8,
@@ -66,6 +70,10 @@ pub fn generate_current_turn_sequences(
     for _ in 0..32 {
         let mut next_frontier = Vec::new();
         for state in frontier {
+            if !state.player.spirit_card_choices.is_empty() {
+                expand_spirit_choices(&state, &mut next_frontier);
+                continue;
+            }
             if state.remaining_tokens.is_empty() {
                 finals.push(TurnSequence {
                     steps: state.steps.clone(),
@@ -90,6 +98,20 @@ pub fn generate_current_turn_sequences(
     }
 
     dedupe_final_sequences(finals)
+}
+
+fn expand_spirit_choices(state: &TurnState, output: &mut Vec<TurnState>) {
+    for choice in &state.player.spirit_card_choices {
+        let mut next = state.clone();
+        let chosen = choice.clone();
+        next.player.spirit_card_choices.clear();
+        next.player.active_cards.push(chosen.clone());
+        next.steps.push(TurnStep::ChooseSpirit {
+            card_id: chosen.card_id,
+            type_arg: chosen.type_arg,
+        });
+        output.push(next);
+    }
 }
 
 fn expand_settlements(state: &TurnState, catalog: &CardCatalog, output: &mut Vec<TurnState>) {
@@ -235,6 +257,7 @@ mod tests {
             player_id: "p1".into(),
             cells: vec![cell(0, 0, vec![Color::Field]), cell(1, 0, Vec::new())],
             active_cards: Vec::new(),
+            spirit_card_choices: Vec::new(),
             completed_cards: Vec::new(),
             empty_hexes: 1,
         };
@@ -260,6 +283,46 @@ mod tests {
                     .steps
                     .iter()
                     .any(|step| matches!(step, TurnStep::SettleCard { .. }))
+        }));
+    }
+
+    #[test]
+    fn spirit_choice_happens_before_normal_turn_actions() {
+        let player = PlayerState {
+            player_id: "p1".into(),
+            cells: vec![cell(0, 0, Vec::new())],
+            active_cards: Vec::new(),
+            spirit_card_choices: vec![
+                ActiveCard {
+                    card_id: 19,
+                    type_arg: 38,
+                    remaining_cubes: 1,
+                    is_spirit: true,
+                },
+                ActiveCard {
+                    card_id: 24,
+                    type_arg: 41,
+                    remaining_cubes: 1,
+                    is_spirit: true,
+                },
+            ],
+            completed_cards: Vec::new(),
+            empty_hexes: 1,
+        };
+        let turns = generate_current_turn_sequences(
+            &player,
+            &[Color::Water],
+            &[],
+            &CardCatalog::default(),
+            BoardSide::SideA,
+            32,
+        );
+        assert!(turns.iter().any(|turn| {
+            matches!(turn.steps.first(), Some(TurnStep::ChooseSpirit { .. }))
+                && turn
+                    .steps
+                    .iter()
+                    .any(|step| matches!(step, TurnStep::PlaceToken { .. }))
         }));
     }
 }

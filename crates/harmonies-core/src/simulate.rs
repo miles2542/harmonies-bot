@@ -200,6 +200,9 @@ fn apply_plan(
             MoveActionV1::DraftCard { card_id, type_arg } => {
                 draft_card(snapshot, player_index, *card_id, *type_arg, catalog);
             }
+            MoveActionV1::ChooseSpirit { card_id, type_arg } => {
+                choose_spirit(snapshot, player_index, *card_id, *type_arg);
+            }
             MoveActionV1::SettleCard {
                 card_id,
                 type_arg,
@@ -225,6 +228,23 @@ fn apply_plan(
     ApplyResult {
         bag_empty_triggered,
     }
+}
+
+fn choose_spirit(snapshot: &mut GameSnapshotV1, player_index: usize, card_id: u32, type_arg: u8) {
+    let player = &mut snapshot.players[player_index];
+    let choice = player
+        .spirit_card_choices
+        .iter()
+        .find(|card| card.card_id == card_id)
+        .cloned()
+        .unwrap_or(crate::ActiveCard {
+            card_id,
+            type_arg,
+            remaining_cubes: 1,
+            is_spirit: true,
+        });
+    player.spirit_card_choices.clear();
+    player.active_cards.push(choice);
 }
 
 fn draft_card(
@@ -341,6 +361,7 @@ mod tests {
             player_id: id.into(),
             cells: vec![empty_cell(0), empty_cell(1), empty_cell(2), empty_cell(3)],
             active_cards: Vec::new(),
+            spirit_card_choices: Vec::new(),
             completed_cards: Vec::new(),
             empty_hexes: 4,
         };

@@ -19,6 +19,10 @@
   function recommend(snapshot) {
     const groups = normalizeCentralGroups(snapshot);
     const chosen = groups.find((group) => group.tokens.length > 0);
+    const perspective = (snapshot?.players || []).find(
+      (player) => player.playerId === snapshot.perspectivePlayerId,
+    );
+    const spiritChoice = perspective?.spiritCardChoices?.[0];
     if (!chosen) {
       return {
         status: "No token groups found",
@@ -33,6 +37,9 @@
         centralGroupId: chosen.groupId,
         title: `Take group ${chosen.groupId}`,
         steps: [
+          ...(spiritChoice
+            ? [`Choose Spirit card ${spiritChoice.typeArg} (id ${spiritChoice.cardId})`]
+            : []),
           `Take: ${chosen.tokens.join(", ")}`,
           `Perspective: ${snapshot.perspectivePlayerId}`,
           `Active player: ${snapshot.activePlayerId}`,

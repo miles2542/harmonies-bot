@@ -34,6 +34,11 @@
   requires Red on Red/Brown/Grey and 3 adjacent top colors.
 - DOM converter handles BGA result-page own-board tokens with `token-*` ids and multiple `level-*`
   classes.
+- Nature Spirit first-turn choice is now explicit in snapshots/advisor plans: unchosen offers live in
+  `spiritCardChoices`, selected spirits live in `activeCards`, and plans emit `chooseSpirit` before
+  token-group actions.
+- Real participant match 12 raw active-turn captures validate `unsafeWindow.gameui.gamedatas`
+  capture, river cards, central groups, bag counts, and first-turn Spirit-choice parsing.
 - Card matcher tests now cover all six rotations, no mirror match, building alias, and catalog cube-target invariants.
 - Extension read-only safety checker now scans JS, local endpoints, and manifest permissions.
 - Rust self-play simulator can replay from raw/normalized BGA snapshots and apply advisor plans with
@@ -44,9 +49,8 @@
 - Need committed anonymized fixture corpus, not just ignored local `temp/` captures.
 - Need fixture set listed in [Snapshot QA](./Snapshot%20QA.md).
 - Need committed anonymized Side A 2p final-score fixture corpus before training/tuning.
-- Best next user-provided evidence: live active-participant Side A 2p raw `gamedatas` capture before
-  a turn starts, preferably near endgame with settlement options visible. Updated userscript uses
-  `unsafeWindow.gameui` for ScriptCat/Tampermonkey.
+- Need more settlement-available active-turn fixtures if BGA exposes edge cases, but match 12 already
+  covers early Spirit choice plus late active-turn search smoke.
 - CMA-ES evaluator still pending; self-play exists as gated smoke/tuning plumbing, not validated
   training loop.
 - Early stop cancels between search phases/expansions, not inside one expensive current-turn generation.

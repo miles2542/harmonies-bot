@@ -146,16 +146,20 @@
     return (move.orderedActions || []).map((action, index) => {
       const prefix = `${index + 1}.`;
       if (action.kind === "takeGroup") {
-        return `${prefix} Take group ${action.groupIndex + 1}: ${action.tokens.map(labelColor).join(", ")}`;
+        const groupIndex = action.groupIndex ?? action.group_index;
+        return `${prefix} Take group ${groupIndex + 1}: ${action.tokens.map(labelColor).join(", ")}`;
       }
       if (action.kind === "placeToken") {
         return `${prefix} Place ${labelColor(action.token)} at (${action.col}, ${action.row})`;
       }
       if (action.kind === "draftCard") {
-        return `${prefix} Draft card ${action.typeArg} (id ${action.cardId})`;
+        return `${prefix} Draft card ${cardTypeArg(action)} (id ${cardId(action)})`;
+      }
+      if (action.kind === "chooseSpirit") {
+        return `${prefix} Choose Spirit card ${cardTypeArg(action)} (id ${cardId(action)})`;
       }
       if (action.kind === "settleCard") {
-        return `${prefix} Settle card ${action.typeArg} cube at (${action.col}, ${action.row})`;
+        return `${prefix} Settle card ${cardTypeArg(action)} cube at (${action.col}, ${action.row})`;
       }
       return `${prefix} ${action.kind}`;
     });
@@ -177,6 +181,14 @@
 
   function labelColor(color) {
     return COLOR_LABELS[color] || "Unknown";
+  }
+
+  function cardId(action) {
+    return action.cardId ?? action.card_id;
+  }
+
+  function cardTypeArg(action) {
+    return action.typeArg ?? action.type_arg;
   }
 
   window.HarmoniesAdvisorClient = { createAdvisorClient };

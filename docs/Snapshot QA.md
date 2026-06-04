@@ -60,7 +60,8 @@ python tools\snapshot_anonymizer.py snapshots\raw\turn.json snapshots\raw\turn.a
 - Snapshot with animal cube locations inside `cubesOnAnimalCards` using `cell_...`.
 - Snapshot with one or more completed animal cards in `doneAnimalCards`.
 - Snapshot with in-progress animal cards and card cubes still on `card_[id]`.
-- Nature Spirit snapshot assigned to a player via `spiritsCards`.
+- First-turn Nature Spirit offer with two unchosen `spiritsCards` and no cubes.
+- Nature Spirit snapshot after selection, where chosen Spirit is in active cards with one cube.
 - Side B snapshot to verify board-side normalization.
 - Numeric BGA player IDs mapped to anonymized `player_1` style IDs.
 - Near-endgame snapshot with low `emptyHexes`.
@@ -69,8 +70,8 @@ python tools\snapshot_anonymizer.py snapshots\raw\turn.json snapshots\raw\turn.a
 
 ## Known Caveats
 
-- Raw active-card count includes player `boardAnimalCards` plus spirit cards whose `location_arg`
-  exactly matches player key. Numeric/anonymized ID mismatches can make raw spirit counts lower than
-  normalized counts.
+- Raw active-card count includes player `boardAnimalCards`; unchosen Spirit offers stay separate as
+  `spiritCardChoices` until one is selected. A selected Spirit has a cube on `card_[id]` and counts
+  as an active card.
 - Raw per-player locked-cell count reports `animalCubesOnBoard`; total locked-cell count also
   includes global `cubesOnAnimalCards` entries with `cell_...` locations.

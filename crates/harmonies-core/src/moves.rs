@@ -274,6 +274,7 @@ mod tests {
             player_id: "p1".into(),
             cells,
             active_cards: Vec::new(),
+            spirit_card_choices: Vec::new(),
             completed_cards: Vec::new(),
             empty_hexes: 0,
         }

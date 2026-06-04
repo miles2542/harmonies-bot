@@ -11,7 +11,7 @@ use crate::{
     eval::EvalWeights,
     model::{BoardSide, GameSnapshotV1, PlayerState},
     scoring::score_player,
-    turn::generate_current_turn_sequences,
+    turn::{generate_current_turn_sequences, TurnSequence, TurnStep},
 };
 
 use deck::{initial_unseen_standard_cards, river_after_turn_with_refills};
@@ -142,7 +142,7 @@ fn root_candidates(
         if tokens.len() != 3 {
             continue;
         }
-        let Some(best_turn) = generate_current_turn_sequences(
+        let turns = generate_current_turn_sequences(
             player,
             tokens,
             &snapshot.river_cards,
@@ -151,23 +151,57 @@ fn root_candidates(
             ROOT_TURN_BEAM_WIDTH,
         )
         .into_iter()
-        .max_by_key(|turn| score_player(&turn.player, snapshot.board_side, catalog).total()) else {
-            continue;
-        };
-        let immediate = score_player(&best_turn.player, snapshot.board_side, catalog);
-        let future_estimate = immediate.total();
-        progress.nodes_evaluated += 1;
-        roots.push(RootCandidate {
-            group_index,
-            tokens: tokens.clone(),
-            turn: best_turn,
-            immediate,
-            future_estimate,
-            utility_estimate: weights.utility(future_estimate, 0),
-            opponent_denial_estimate: 0,
+        .fold(Vec::<TurnSequence>::new(), |mut best_by_choice, turn| {
+            upsert_best_turn_by_spirit_choice(&mut best_by_choice, turn, snapshot, catalog);
+            best_by_choice
         });
+        if turns.is_empty() {
+            continue;
+        }
+        for turn in turns {
+            let immediate = score_player(&turn.player, snapshot.board_side, catalog);
+            let future_estimate = immediate.total();
+            progress.nodes_evaluated += 1;
+            roots.push(RootCandidate {
+                group_index,
+                tokens: tokens.clone(),
+                turn,
+                immediate,
+                future_estimate,
+                utility_estimate: weights.utility(future_estimate, 0),
+                opponent_denial_estimate: 0,
+            });
+        }
     }
     roots
+}
+
+fn upsert_best_turn_by_spirit_choice(
+    best_by_choice: &mut Vec<TurnSequence>,
+    turn: TurnSequence,
+    snapshot: &GameSnapshotV1,
+    catalog: &CardCatalog,
+) {
+    let choice = spirit_choice_key(&turn);
+    let score = score_player(&turn.player, snapshot.board_side, catalog).total();
+    if let Some(existing) = best_by_choice
+        .iter_mut()
+        .find(|existing| spirit_choice_key(existing) == choice)
+    {
+        let existing_score = score_player(&existing.player, snapshot.board_side, catalog).total();
+        if score > existing_score {
+            *existing = turn;
+        }
+    } else {
+        best_by_choice.push(turn);
+    }
+}
+
+fn spirit_choice_key(turn: &TurnSequence) -> Option<(u32, u8)> {
+    turn.steps.iter().find_map(|step| match step {
+        TurnStep::ChooseSpirit { card_id, type_arg } => Some((*card_id, *type_arg)),
+        _ => None,
+    })
 }
 
 fn estimate_depth(
@@ -352,11 +386,22 @@ fn state_after_root(
 }
 
 fn root_plan(root: RootCandidate) -> MovePlanV1 {
-    let mut actions = vec![MoveActionV1::TakeGroup {
+    let take_group = MoveActionV1::TakeGroup {
         group_index: root.group_index,
         tokens: root.tokens,
-    }];
-    actions.extend(root.turn.steps.into_iter().map(turn_step_action));
+    };
+    let mut actions = Vec::new();
+    let mut take_group_inserted = false;
+    for step in root.turn.steps {
+        if !take_group_inserted && !matches!(step, TurnStep::ChooseSpirit { .. }) {
+            actions.push(take_group.clone());
+            take_group_inserted = true;
+        }
+        actions.push(turn_step_action(step));
+    }
+    if !take_group_inserted {
+        actions.push(take_group);
+    }
     MovePlanV1 {
         central_group_index: root.group_index,
         ordered_actions: actions,

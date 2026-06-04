@@ -212,6 +212,24 @@ that player, not a confirmed scorer bug.
   - Near-end DOM normalizes and returns advisor plans, but it has no `gamedatas` and no river-card
     display. Use updated capture helper for active-turn raw parser/search validation.
 
+- Real participant match 12 files:
+  - `1780583698740`: early active turn before action. Raw `gamedatas` present with `chooseAction`,
+    Side A, 2 players, active player `98885479`, 5 river cards, 5 central token groups, and 102
+    remaining tokens.
+  - `1780584034059`: late-mid active turn before action. Raw `gamedatas` present with `chooseAction`,
+    Side A, 2 players, active player `98885479`, 5 river cards, 5 central token groups, and 72
+    remaining tokens.
+  - `1780584200332`: post-game. Raw `gamedatas` result total is present but embedded board state is
+    stale (`score_aux=8`, raw board cubes 2/5). Use DOM conversion for final parity.
+  - DOM final parity:
+    - Red/__bunny/player `98885479`: terrain 10 leaf + 3 mountain + 8 water = 21;
+      cubes 14 spirit card 41 + 10 + 9 + 0 + 16 = 49; total 70.
+    - Green/Greeney28/player `96385036`: terrain 7 leaf + 10 brick + 2 water = 19;
+      cubes 12 spirit card 37 + 8 + 4 + 17 = 41; total 60.
+  - First-turn raw snapshot showed BGA Spirit choice state: two offered cards in `spiritsCards`,
+    no cube on either card. These must be `spiritCardChoices`, not `activeCards`. After selection,
+    the chosen Spirit appears as an active card with one cube.
+
 Current exact parity gate:
 
 ```powershell
@@ -219,4 +237,5 @@ python -m tools.score_qa temp\normalized-match8-dom.json --expected 96117860=116
 python -m tools.score_qa temp\normalized-match9-dom.json --expected 98816549=104 --expected 85116272=88
 python -m tools.score_qa temp\normalized-match10-dom.json --expected 99809470=96 --expected 95645953=104
 python -m tools.score_qa temp\normalized-real-bunny-postgame-dom.json --expected 98885479=69 --expected 99922119=117
+python -m tools.score_qa temp\normalized-match12-post-dom.json --expected 98885479=70 --expected 96385036=60
 ```

@@ -168,11 +168,14 @@ fn normalize_player(
         player_id,
         &card_cube_counts,
     ));
+    let spirit_card_choices =
+        parse_player_spirit_choices(gamedatas.get("spiritsCards"), player_id, &card_cube_counts);
 
     PlayerState {
         player_id: player_id.to_owned(),
         cells,
         active_cards,
+        spirit_card_choices,
         completed_cards: parse_cards(value.get("doneAnimalCards"), &card_cube_counts, true),
         empty_hexes: value
             .get("emptyHexes")
@@ -319,10 +322,40 @@ fn parse_player_spirits(
         })
         .filter_map(|card| {
             let card_id = card.get("id")?.as_u64()? as u32;
+            let remaining_cubes = cube_counts.get(&card_id).copied()?;
             Some(ActiveCard {
                 card_id,
                 type_arg: card.get("type_arg")?.as_u64()? as u8,
-                remaining_cubes: cube_counts.get(&card_id).copied().unwrap_or(1),
+                remaining_cubes,
+                is_spirit: true,
+            })
+        })
+        .collect()
+}
+
+fn parse_player_spirit_choices(
+    value: Option<&Value>,
+    player_id: &str,
+    cube_counts: &HashMap<u32, u8>,
+) -> Vec<ActiveCard> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|card| {
+            card.get("location_arg")
+                .map(|location| value_matches_id(location, player_id))
+                .unwrap_or(false)
+        })
+        .filter_map(|card| {
+            let card_id = card.get("id")?.as_u64()? as u32;
+            if cube_counts.contains_key(&card_id) {
+                return None;
+            }
+            Some(ActiveCard {
+                card_id,
+                type_arg: card.get("type_arg")?.as_u64()? as u8,
+                remaining_cubes: 1,
                 is_spirit: true,
             })
         })

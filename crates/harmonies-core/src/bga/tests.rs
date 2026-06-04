@@ -241,3 +241,63 @@ fn active_card_remaining_cubes_come_from_card_cube_locations() {
     let snapshot = normalize_gamedatas(&raw, Some("p1")).unwrap();
     assert_eq!(snapshot.players[0].active_cards[0].remaining_cubes, 3);
 }
+
+#[test]
+fn unchosen_spirit_offer_is_separate_from_active_cards() {
+    let raw = json!({
+        "version": "230603",
+        "boardSide": "sideA",
+        "hexes": [],
+        "gamestate": {"active_player": "p1"},
+        "players": {
+            "p1": {
+                "emptyHexes": 0,
+                "tokensOnBoard": {},
+                "boardAnimalCards": [],
+                "doneAnimalCards": []
+            }
+        },
+        "tokensOnCentralBoard": {},
+        "river": [],
+        "spiritsCards": [
+            {"id": 19, "type_arg": 38, "location_arg": "p1", "isSpirit": true},
+            {"id": 24, "type_arg": 41, "location_arg": "p1", "isSpirit": true}
+        ],
+        "cubesOnAnimalCards": []
+    });
+    let snapshot = normalize_gamedatas(&raw, Some("p1")).unwrap();
+    assert!(snapshot.players[0].active_cards.is_empty());
+    assert_eq!(snapshot.players[0].spirit_card_choices.len(), 2);
+    assert_eq!(
+        snapshot.players[0].spirit_card_choices[0].remaining_cubes,
+        1
+    );
+}
+
+#[test]
+fn chosen_spirit_with_cube_is_active_card() {
+    let raw = json!({
+        "version": "230603",
+        "boardSide": "sideA",
+        "hexes": [],
+        "gamestate": {"active_player": "p1"},
+        "players": {
+            "p1": {
+                "emptyHexes": 0,
+                "tokensOnBoard": {},
+                "boardAnimalCards": [],
+                "doneAnimalCards": []
+            }
+        },
+        "tokensOnCentralBoard": {},
+        "river": [],
+        "spiritsCards": [
+            {"id": 19, "type_arg": 38, "location_arg": "p1", "isSpirit": true}
+        ],
+        "cubesOnAnimalCards": [{"location": "card_19"}]
+    });
+    let snapshot = normalize_gamedatas(&raw, Some("p1")).unwrap();
+    assert_eq!(snapshot.players[0].active_cards.len(), 1);
+    assert_eq!(snapshot.players[0].active_cards[0].type_arg, 38);
+    assert!(snapshot.players[0].spirit_card_choices.is_empty());
+}

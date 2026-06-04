@@ -56,7 +56,11 @@ pub struct MovePlanV1 {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase", tag = "kind")]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "kind"
+)]
 pub enum MoveActionV1 {
     TakeGroup {
         group_index: usize,
@@ -74,6 +78,10 @@ pub enum MoveActionV1 {
         row: i8,
     },
     DraftCard {
+        card_id: u32,
+        type_arg: u8,
+    },
+    ChooseSpirit {
         card_id: u32,
         type_arg: u8,
     },
@@ -181,6 +189,9 @@ pub(crate) fn turn_step_action(step: TurnStep) -> MoveActionV1 {
             row: coord.row,
         },
         TurnStep::DraftCard { card_id, type_arg } => MoveActionV1::DraftCard { card_id, type_arg },
+        TurnStep::ChooseSpirit { card_id, type_arg } => {
+            MoveActionV1::ChooseSpirit { card_id, type_arg }
+        }
         TurnStep::SettleCard {
             card_id,
             type_arg,
@@ -228,6 +239,7 @@ mod tests {
                 player_id: "p1".into(),
                 cells,
                 active_cards: Vec::new(),
+                spirit_card_choices: Vec::new(),
                 completed_cards: Vec::new(),
                 empty_hexes: 3,
             }],
@@ -247,5 +259,65 @@ mod tests {
         });
         assert_eq!(response.status, AdvisorStatus::Ready);
         assert_eq!(response.best_moves[0].ordered_actions.len(), 4);
+    }
+
+    #[test]
+    fn advisor_shows_spirit_choice_before_token_group() {
+        let snapshot = GameSnapshotV1 {
+            schema_version: 1,
+            perspective_player_id: "p1".into(),
+            active_player_id: "p1".into(),
+            board_side: BoardSide::SideA,
+            players: vec![PlayerState {
+                player_id: "p1".into(),
+                cells: vec![
+                    Cell {
+                        coord: Coord { col: 0, row: 0 },
+                        stack: Stack::default(),
+                        locked_by_cube: false,
+                    },
+                    Cell {
+                        coord: Coord { col: 1, row: 0 },
+                        stack: Stack::default(),
+                        locked_by_cube: false,
+                    },
+                    Cell {
+                        coord: Coord { col: 2, row: 0 },
+                        stack: Stack::default(),
+                        locked_by_cube: false,
+                    },
+                ],
+                active_cards: Vec::new(),
+                spirit_card_choices: vec![crate::ActiveCard {
+                    card_id: 19,
+                    type_arg: 38,
+                    remaining_cubes: 1,
+                    is_spirit: true,
+                }],
+                completed_cards: Vec::new(),
+                empty_hexes: 3,
+            }],
+            central_token_groups: vec![vec![Color::Water, Color::Field, Color::Mountain]],
+            river_cards: Vec::new(),
+            bag_counts: BagCounts::default(),
+            cards_catalog_version: "test".into(),
+        };
+        let response = advise(AdvisorRequestV1 {
+            snapshot,
+            time_budget_ms: 1000,
+            max_results: 1,
+            seed: 1,
+            runtime_mode: "native".into(),
+            catalog: CardCatalog::default(),
+            weights: EvalWeights::default(),
+        });
+        assert!(matches!(
+            response.best_moves[0].ordered_actions.first(),
+            Some(MoveActionV1::ChooseSpirit { .. })
+        ));
+        assert!(matches!(
+            response.best_moves[0].ordered_actions.get(1),
+            Some(MoveActionV1::TakeGroup { .. })
+        ));
     }
 }
