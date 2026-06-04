@@ -14,7 +14,7 @@
     "Card pattern/catalog details omitted because GameSnapshotV1 only needs card ids, type args, cube counts.",
   ];
 
-  function normalizeGamedatas(gamedatas, perspectivePlayerId) {
+  function normalizeGamedatas(gamedatas, perspectivePlayerId, options = {}) {
     if (!isObject(gamedatas)) {
       throw new Error("gamedatas must be an object");
     }
@@ -29,10 +29,13 @@
 
     const playerIds = mapPlayerIds(gamedatas, playersById);
     const perspective = resolvePerspective(gamedatas, playersById, playerIds, perspectivePlayerId);
-    const activePlayerId = normalizePlayerId(readActivePlayerId(gamedatas), playerIds) || perspective;
+    const activePlayerId = normalizePlayerId(readActivePlayerId(gamedatas), playerIds);
     const allCubeLocations = collectAllCubeLocations(gamedatas, playersById);
     const cardCubeCounts = countCardCubes(gamedatas.cubesOnAnimalCards);
-    const centralTokenGroups = parseCentralGroups(gamedatas.tokensOnCentralBoard);
+    const centralTokenGroups =
+      Array.isArray(options.centralTokenGroups) && options.centralTokenGroups.length
+        ? options.centralTokenGroups
+        : parseCentralGroups(gamedatas.tokensOnCentralBoard);
     const players = Object.entries(playersById).map(([playerId, player]) =>
       normalizePlayer(playerId, player, gamedatas, hexes, allCubeLocations, cardCubeCounts, playerIds),
     );
@@ -68,8 +71,11 @@
       };
     });
     const activeCards = parseCards(player.boardAnimalCards, cardCubeCounts, false);
-    activeCards.push(...parsePlayerSpirits(gamedatas.spiritsCards, playerId, cardCubeCounts));
-    const spiritCardChoices = parsePlayerSpiritChoices(gamedatas.spiritsCards, playerId, cardCubeCounts);
+    const playerSpirits = parsePlayerSpirits(gamedatas.spiritsCards, playerId, cardCubeCounts, gamedatas);
+    activeCards.push(...playerSpirits);
+    const spiritCardChoices = playerSpirits.length
+      ? []
+      : parsePlayerSpiritChoices(gamedatas.spiritsCards, playerId, cardCubeCounts, gamedatas);
 
     return {
       playerId,
@@ -227,26 +233,33 @@
       .filter(Boolean);
   }
 
-  function parsePlayerSpirits(value, playerId, cubeCounts) {
+  function parsePlayerSpirits(value, playerId, cubeCounts, gamedatas) {
+    const inChoiceState = isSpiritChoiceState(gamedatas);
     return arrayValue(value)
       .filter((card) => String(card.location_arg) === playerId)
       .map((card) => {
         const cardId = numberValue(card.id);
         const typeArg = numberValue(card.type_arg);
-        if (!Number.isFinite(cardId) || !Number.isFinite(typeArg) || !cubeCounts.has(cardId)) {
+        if (!Number.isFinite(cardId) || !Number.isFinite(typeArg)) {
+          return null;
+        }
+        if (inChoiceState && !cubeCounts.has(cardId)) {
           return null;
         }
         return {
           cardId,
           typeArg,
-          remainingCubes: cubeCounts.get(cardId),
+          remainingCubes: cubeCounts.get(cardId) ?? 1,
           isSpirit: true,
         };
       })
       .filter(Boolean);
   }
 
-  function parsePlayerSpiritChoices(value, playerId, cubeCounts) {
+  function parsePlayerSpiritChoices(value, playerId, cubeCounts, gamedatas) {
+    if (!isSpiritChoiceState(gamedatas)) {
+      return [];
+    }
     return arrayValue(value)
       .filter((card) => String(card.location_arg) === playerId)
       .map((card) => {
@@ -263,6 +276,13 @@
         };
       })
       .filter(Boolean);
+  }
+
+  function isSpiritChoiceState(gamedatas) {
+    const text = `${gamedatas?.gamestate?.name || ""} ${
+      gamedatas?.gamestate?.description || ""
+    }`.toLowerCase();
+    return text.includes("spirit") && text.includes("choose");
   }
 
   function remainingCubeCount(card, cardId, cubeCounts) {

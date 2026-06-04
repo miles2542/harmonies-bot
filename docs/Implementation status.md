@@ -53,6 +53,12 @@
   active-turn fixtures.
 - Extension overlay now highlights verified BGA central holes (`#hole-1..5`) and marks recommended
   board cells (`#cell_<playerId>_<col>_<row>`) with action step badges.
+- Extension advisor run is now manual: cached page state only, search starts on `Analyze`, `Stop`
+  does not auto-restart, and same-page updates no longer trigger repeated searches.
+- Extension central token groups prefer visible DOM tokens (`#hole-N-token-1..3`) when all five groups
+  are readable, falling back to `gamedatas.tokensOnCentralBoard`.
+- `tools/bga_harmonies_group_inspector.user.js` compares visible DOM central groups against
+  `gamedatas` and labels holes for active/spectated parser QA.
 
 ## Known Gaps
 
@@ -67,4 +73,5 @@
 - Opponent handling is v1 heuristic only: visible current-board value for central token groups, not full opponent future search.
 - WASM runtime gate pending; native service path exists.
 - Extension uses native service when running, streaming WebSocket first; mock fallback otherwise.
-- Live BGA extension visual QA still pending: confirm highlighted cells/groups align on an active table.
+- Live BGA extension visual QA still pending after manual-flow patch: confirm DOM group inspector,
+  highlighted cells/groups, and first-turn Spirit plan on active table.

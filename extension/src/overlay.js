@@ -15,13 +15,19 @@
     root.innerHTML = `
       <header class="harmonies-advisor-header">
         <strong>Harmonies Advisor</strong>
-        <button type="button" data-action="stop" title="Stop search">Stop</button>
+        <div class="harmonies-advisor-actions">
+          <button type="button" data-action="analyze" title="Analyze current state">Analyze</button>
+          <button type="button" data-action="stop" title="Stop search">Stop</button>
+        </div>
         <button type="button" data-action="toggle" title="Collapse panel">_</button>
       </header>
       <div class="harmonies-advisor-body">
         <div class="harmonies-advisor-status">Starting</div>
         <div class="harmonies-advisor-best"></div>
         <ol class="harmonies-advisor-steps"></ol>
+        <button type="button" class="harmonies-advisor-alt-toggle" data-action="alternatives">
+          Alternatives
+        </button>
         <div class="harmonies-advisor-alternatives"></div>
       </div>
     `;
@@ -30,10 +36,19 @@
     root.querySelector("[data-action='toggle']").addEventListener("click", () => {
       root.classList.toggle("is-collapsed");
     });
+    root.querySelector("[data-action='alternatives']").addEventListener("click", () => {
+      root.classList.toggle("show-alternatives");
+    });
 
     return {
+      onAnalyze(callback) {
+        root.querySelector("[data-action='analyze']").addEventListener("click", callback);
+      },
       onStop(callback) {
         root.querySelector("[data-action='stop']").addEventListener("click", callback);
+      },
+      setAnalyzeLabel(label) {
+        root.querySelector("[data-action='analyze']").textContent = label;
       },
       setStatus(message) {
         root.querySelector(".harmonies-advisor-status").textContent = message;
@@ -45,9 +60,13 @@
         const best = root.querySelector(".harmonies-advisor-best");
         const steps = root.querySelector(".harmonies-advisor-steps");
         const alternatives = root.querySelector(".harmonies-advisor-alternatives");
+        const responseAlternatives = response.alternatives || [];
+        const hasAlternatives = responseAlternatives.length > 0;
+        root.classList.toggle("has-alternatives", hasAlternatives);
+        root.classList.toggle("show-alternatives", false);
         best.textContent = response.bestMove?.title || "No recommendation";
         steps.replaceChildren(...(response.bestMove?.steps || []).map(renderStep));
-        alternatives.replaceChildren(...response.alternatives.map(renderAlternative));
+        alternatives.replaceChildren(...responseAlternatives.map(renderAlternative));
 
         if (response.bestMove?.centralGroupId) {
           highlightCentralGroup(response.bestMove.centralGroupId);

@@ -14,10 +14,11 @@
 
   function createAdvisorClient() {
     return {
-      async getRecommendation(gamedatas, onUpdate, perspectivePlayerId) {
+      async getRecommendation(gamedatas, onUpdate, perspectivePlayerId, options = {}) {
         const snapshot = window.HarmoniesBgaNormalizer.normalizeGamedatas(
           gamedatas,
           perspectivePlayerId,
+          { centralTokenGroups: options.centralTokenGroups },
         );
         try {
           const response = await requestNativeAdvisor(snapshot, (partialResponse) => {
@@ -54,9 +55,31 @@
       snapshot,
       timeBudgetMs: 48000,
       maxResults: 3,
-      seed: Date.now(),
+      seed: optionsSeed(snapshot),
       runtimeMode: "native-service",
     };
+  }
+
+  function optionsSeed(snapshot) {
+    const input = JSON.stringify({
+      perspectivePlayerId: snapshot.perspectivePlayerId,
+      activePlayerId: snapshot.activePlayerId,
+      centralTokenGroups: snapshot.centralTokenGroups,
+      riverCards: snapshot.riverCards,
+      players: snapshot.players.map((player) => ({
+        playerId: player.playerId,
+        cells: player.cells,
+        activeCards: player.activeCards,
+        spiritCardChoices: player.spiritCardChoices,
+        completedCards: player.completedCards,
+      })),
+    });
+    let hash = 2166136261;
+    for (let index = 0; index < input.length; index += 1) {
+      hash ^= input.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
   }
 
   async function requestNativeAdvisorHttp(request) {

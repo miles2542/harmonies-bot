@@ -4,14 +4,21 @@
 
   const overlay = window.HarmoniesAdvisorOverlay.createOverlay();
   const advisorClient = window.HarmoniesAdvisorClient.createAdvisorClient();
+  let latestPayload = null;
   let isAnalyzing = false;
   let activeStateKey = "";
-  let completedStateKey = "";
-  let stoppedStateKey = "";
+  overlay.onAnalyze(() => {
+    handleAnalyzeClick().catch((error) => {
+      isAnalyzing = false;
+      overlay.setAnalyzeLabel("Retry");
+      overlay.setStatus(`Advisor error: ${error.message}`);
+    });
+  });
   overlay.onStop(() => {
-    stoppedStateKey = activeStateKey;
     advisorClient.stop();
-    overlay.setStatus(isAnalyzing ? "Stopping search" : "Search stopped; waiting for state change");
+    isAnalyzing = false;
+    overlay.setAnalyzeLabel("Retry");
+    overlay.setStatus("Search stopped");
   });
 
   function injectPageBridge() {
@@ -49,50 +56,73 @@
     return Boolean(playerId && players[playerId]);
   }
 
-  async function handleState(payload) {
+  function handleState(payload) {
+    latestPayload = payload || null;
+    const gamedatas = latestPayload?.gamedatas;
+    if (!isHarmoniesGame(gamedatas)) {
+      overlay.setStatus("Waiting for Harmonies table");
+      return;
+    }
+    if (!isActiveParticipant(gamedatas, latestPayload)) {
+      const detected = getCurrentPlayerId(gamedatas, latestPayload) || "none";
+      overlay.setStatus(`Participant not detected; player ${detected}`);
+      return;
+    }
+    if (!isAnalyzing && !activeStateKey) {
+      overlay.setStatus("Ready to analyze current state");
+    }
+  }
+
+  async function handleAnalyzeClick() {
+    const payload = latestPayload;
     const gamedatas = payload?.gamedatas;
     if (!isHarmoniesGame(gamedatas)) {
       overlay.setStatus("Waiting for Harmonies table");
       return;
     }
     if (!isActiveParticipant(gamedatas, payload)) {
-      const detected = getCurrentPlayerId(gamedatas, payload) || "none";
-      overlay.setStatus(`Participant not detected; player ${detected}`);
+      overlay.setStatus("Participant not detected");
       return;
     }
 
     const playerId = getCurrentPlayerId(gamedatas, payload);
+    if (!isOurActionPhase(gamedatas, playerId)) {
+      overlay.setStatus("Waiting for your active action phase");
+      return;
+    }
     const stateKey = buildStateKey(gamedatas, playerId);
     if (!stateKey) {
       overlay.setStatus("Waiting for complete table state");
       return;
     }
-    if (isAnalyzing || stateKey === completedStateKey) {
-      return;
-    }
-    if (stateKey === stoppedStateKey) {
-      overlay.setStatus("Search stopped; waiting for state change");
+    if (isAnalyzing) {
       return;
     }
 
     isAnalyzing = true;
     activeStateKey = stateKey;
+    overlay.setAnalyzeLabel("Analyze");
     overlay.setStatus("Analyzing visible state");
+    const centralTokenGroups = readDomCentralTokenGroups();
     try {
       const response = await advisorClient.getRecommendation(gamedatas, (partialResponse) => {
         if (activeStateKey === stateKey) {
           overlay.renderRecommendation(partialResponse);
         }
-      }, playerId);
+      }, playerId, { centralTokenGroups });
       if (activeStateKey === stateKey) {
         overlay.renderRecommendation(response);
-        completedStateKey = stateKey;
       }
     } finally {
       if (activeStateKey === stateKey) {
         isAnalyzing = false;
+        overlay.setAnalyzeLabel("Retry");
       }
     }
+  }
+
+  function isOurActionPhase(gamedatas, playerId) {
+    return String(gamedatas?.gamestate?.active_player || "") === String(playerId);
   }
 
   function buildStateKey(gamedatas, playerId) {
@@ -105,7 +135,7 @@
       activePlayer: gamedatas?.gamestate?.active_player || "",
       stateName: gamedatas?.gamestate?.name || "",
       remainingTokens: gamedatas?.remainingTokens ?? null,
-      central: compactCentralGroups(gamedatas?.tokensOnCentralBoard),
+      central: readDomCentralTokenGroups(),
       river: compactCards(gamedatas?.river),
       spirits: compactCards(gamedatas?.spiritsCards),
       boardCards: compactCards(player.boardAnimalCards),
@@ -120,16 +150,13 @@
   function compactCentralGroups(groups) {
     return Object.entries(groups || {})
       .sort(([left], [right]) => Number.parseInt(left, 10) - Number.parseInt(right, 10))
-      .map(([key, tokens]) => [key, compactTokens(tokens)]);
+      .map(([key, tokens]) => [key, compactCentralTokens(tokens)]);
   }
 
-  function compactTokens(tokens) {
-    return (Array.isArray(tokens) ? tokens : []).map((token) => [
-      token?.id ?? null,
-      token?.type_arg ?? null,
-      token?.location ?? null,
-      token?.location_arg ?? null,
-    ]);
+  function compactCentralTokens(tokens) {
+    return (Array.isArray(tokens) ? tokens : [])
+      .map((token) => colorByTypeArg(token?.type_arg))
+      .filter(Boolean);
   }
 
   function compactCards(cards) {
@@ -142,13 +169,56 @@
     ]);
   }
 
+  function readDomCentralTokenGroups() {
+    const groups = [];
+    for (let groupId = 1; groupId <= 5; groupId += 1) {
+      const hole = document.getElementById(`hole-${groupId}`);
+      if (!hole) {
+        continue;
+      }
+      const tokenNodes = [1, 2, 3]
+        .map((tokenIndex) => document.getElementById(`hole-${groupId}-token-${tokenIndex}`))
+        .filter(Boolean);
+      const tokens = (tokenNodes.length ? tokenNodes : Array.from(hole.querySelectorAll(".hole-token, .colored-token")))
+        .map(domTokenColor)
+        .filter(Boolean);
+      groups.push(tokens);
+    }
+    if (groups.length === 5 && groups.every((tokens) => tokens.length === 3)) {
+      return groups;
+    }
+    return compactCentralGroups(latestPayload?.gamedatas?.tokensOnCentralBoard).map(
+      ([, tokens]) => tokens,
+    );
+  }
+
+  function domTokenColor(node) {
+    const className = String(node.className || "");
+    const match = /(?:^|\s)color-(\d)(?:\s|$)/.exec(className);
+    return colorByTypeArg(match?.[1]);
+  }
+
+  function colorByTypeArg(typeArg) {
+    return {
+      1: "water",
+      2: "mountain",
+      3: "trunk",
+      4: "foliage",
+      5: "field",
+      6: "building",
+      7: "building",
+    }[Number(typeArg)];
+  }
+
   window.addEventListener("message", (event) => {
     if (event.source !== window || event.data?.type !== EVENT_TYPE) {
       return;
     }
-    handleState(event.data.payload).catch((error) => {
+    try {
+      handleState(event.data.payload);
+    } catch (error) {
       overlay.setStatus(`Advisor error: ${error.message}`);
-    });
+    }
   });
 
   injectPageBridge();
