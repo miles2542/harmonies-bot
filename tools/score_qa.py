@@ -49,6 +49,28 @@ def load_capture_expected(snapshot: Path) -> list[ExpectedScore]:
     return expected
 
 
+def load_bga_result_expected(snapshot: Path) -> list[ExpectedScore]:
+    with snapshot.open("r", encoding="utf-8") as file:
+        data = json.load(file)
+    gamedatas = data.get("gamedatas", data)
+    result = (
+        gamedatas.get("gamestate", {})
+        .get("args", {})
+        .get("result", [])
+    )
+    expected = []
+    for item in result:
+        player_id = str(item.get("player") or item.get("id") or "")
+        raw_total = item.get("score")
+        try:
+            total = int(raw_total)
+        except (TypeError, ValueError):
+            continue
+        if player_id:
+            expected.append(ExpectedScore(player_id=player_id, total=total))
+    return expected
+
+
 def player_totals(report: dict[str, Any]) -> dict[str, int]:
     totals: dict[str, int] = {}
     for player in report.get("players", []):
@@ -90,6 +112,7 @@ def main() -> None:
     parser.add_argument("snapshot", type=Path)
     parser.add_argument("--expected", action="append", type=parse_expected, default=[])
     parser.add_argument("--use-capture-scores", action="store_true")
+    parser.add_argument("--use-bga-result", action="store_true")
     parser.add_argument("--perspective")
     parser.add_argument("--catalog", type=Path, default=Path("docs/cards_database.json"))
     parser.add_argument("--report", type=Path)
@@ -98,8 +121,10 @@ def main() -> None:
     expected = list(args.expected)
     if args.use_capture_scores:
         expected.extend(load_capture_expected(args.snapshot))
+    if args.use_bga_result:
+        expected.extend(load_bga_result_expected(args.snapshot))
     if not expected:
-        raise SystemExit("no expected scores provided or found in capture scoreHints")
+        raise SystemExit("no expected scores provided or found in selected snapshot fields")
     report = run_score(args.snapshot, args.perspective, args.catalog)
     comparison = compare_scores(report, expected)
     output = json.dumps(comparison, indent=2)

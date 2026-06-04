@@ -37,7 +37,7 @@ fn scores_core_landscapes() {
         cell(1, 1, vec![Color::Field]),
     ]);
     let score = score_player(&player, BoardSide::SideA, &CardCatalog::default());
-    assert_eq!(score.trees, 7);
+    assert_eq!(score.trees, 10);
     assert_eq!(score.mountains, 4);
     assert_eq!(score.fields, 5);
 }

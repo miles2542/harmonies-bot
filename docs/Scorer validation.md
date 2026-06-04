@@ -56,5 +56,25 @@ If capture `scoreHints` contain matching player ids:
 python -m tools.score_qa temp\snapshots\final-capture.json --use-capture-scores
 ```
 
+If BGA result data is present in `gamedatas.gamestate.args.result`:
+
+```powershell
+python -m tools.score_qa temp\snapshots\final-capture.json --use-bga-result
+```
+
 Pass means engine totals match expected BGA totals for listed players. Fail means scorer or
 normalizer needs investigation before training.
+
+## Current Side A Fixture Status
+
+Known failing captures in `temp\snapshots`:
+
+- `harmonies-gamedatas-1780544344340 (real active participant side A post-game result).json`:
+  `player_1` expected 101, current 103; `player_2` passes at 93.
+- `harmonies-gamedatas-1780545283771 (same spectate game X but captured post-game in result page).json`:
+  expected 112 / 103, current 106 / 95.
+- `harmonies-gamedatas-1780545388024 (spectate 2p side A nature spirit post-game capture).json`:
+  expected 117 / 114, current 112 / 89.
+
+Do not run weight training until these pass or the scorer discrepancy is explained by a documented
+capture/result mismatch.

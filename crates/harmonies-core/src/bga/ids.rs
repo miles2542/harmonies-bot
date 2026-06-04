@@ -14,11 +14,14 @@ pub(super) fn map_player_ids(gamedatas: &Value) -> HashMap<String, String> {
         if let Some(id) = string_field(player, "id") {
             ids.insert(id, key.clone());
         }
-        if let Some(order_id) = player_order_id_for_player(gamedatas, player) {
-            ids.insert(order_id, key.clone());
+        let inferred_ids = infer_player_ids_from_locations(player);
+        for inferred in &inferred_ids {
+            ids.insert(inferred.clone(), key.clone());
         }
-        for inferred in infer_player_ids_from_locations(player) {
-            ids.insert(inferred, key.clone());
+        if inferred_ids.is_empty() {
+            if let Some(order_id) = player_order_id_for_player(gamedatas, player) {
+                ids.insert(order_id, key.clone());
+            }
         }
     }
     ids
@@ -34,10 +37,14 @@ pub(super) fn bga_ids_for_player(
     if let Some(id) = string_field(player, "id") {
         ids.push(id);
     }
-    if let Some(order_id) = player_order_id_for_player(gamedatas, player) {
-        ids.push(order_id);
+    let inferred = infer_player_ids_from_locations(player);
+    if inferred.is_empty() {
+        if let Some(order_id) = player_order_id_for_player(gamedatas, player) {
+            ids.push(order_id);
+        }
+    } else {
+        ids.extend(inferred);
     }
-    ids.extend(infer_player_ids_from_locations(player));
     ids.extend(
         mapped_ids
             .iter()

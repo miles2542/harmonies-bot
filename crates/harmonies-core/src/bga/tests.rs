@@ -161,3 +161,83 @@ fn locks_cells_when_player_no_maps_second_order_entry() {
         .unwrap();
     assert!(player.cells[0].locked_by_cube);
 }
+
+#[test]
+fn player_location_ids_override_conflicting_player_order() {
+    let raw = json!({
+        "version": "230603",
+        "boardSide": "sideA",
+        "hexes": [{"col": 0, "row": 0}],
+        "playerorder": [111, 222],
+        "gamestate": {"active_player": "player_1"},
+        "players": {
+            "player_1": {
+                "id": "player_1",
+                "playerNo": 1,
+                "emptyHexes": 0,
+                "tokensOnBoard": {
+                    "cell_222_0_0": [{"location_arg": 1, "type_arg": 5}]
+                },
+                "boardAnimalCards": [{"id": 10, "type_arg": 1, "pointLocations": [2]}],
+                "doneAnimalCards": []
+            },
+            "player_2": {
+                "id": "player_2",
+                "playerNo": 2,
+                "emptyHexes": 0,
+                "tokensOnBoard": {
+                    "cell_111_0_0": [{"location_arg": 1, "type_arg": 1}]
+                },
+                "boardAnimalCards": [],
+                "doneAnimalCards": []
+            }
+        },
+        "tokensOnCentralBoard": {},
+        "river": [],
+        "spiritsCards": [],
+        "cubesOnAnimalCards": [{"location": "card_10"}]
+    });
+    let snapshot = normalize_gamedatas(&raw, None).unwrap();
+    let player_1 = snapshot
+        .players
+        .iter()
+        .find(|player| player.player_id == "player_1")
+        .unwrap();
+    let player_2 = snapshot
+        .players
+        .iter()
+        .find(|player| player.player_id == "player_2")
+        .unwrap();
+    assert_eq!(player_1.cells[0].stack.top(), Some(Color::Field));
+    assert_eq!(player_2.cells[0].stack.top(), Some(Color::Water));
+}
+
+#[test]
+fn active_card_location_arg_tracks_placed_cubes() {
+    let raw = json!({
+        "version": "230603",
+        "boardSide": "sideA",
+        "hexes": [],
+        "gamestate": {"active_player": "p1"},
+        "players": {
+            "p1": {
+                "emptyHexes": 0,
+                "tokensOnBoard": {},
+                "boardAnimalCards": [
+                    {"id": 31, "type_arg": 21, "location_arg": 2, "pointLocations": [4, 10, 16]}
+                ],
+                "doneAnimalCards": []
+            }
+        },
+        "tokensOnCentralBoard": {},
+        "river": [],
+        "spiritsCards": [],
+        "cubesOnAnimalCards": [
+            {"location": "card_31"},
+            {"location": "card_31"},
+            {"location": "card_31"}
+        ]
+    });
+    let snapshot = normalize_gamedatas(&raw, Some("p1")).unwrap();
+    assert_eq!(snapshot.players[0].active_cards[0].remaining_cubes, 1);
+}
