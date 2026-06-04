@@ -2,8 +2,9 @@
 
 Primary target: 2-player Side A, Nature Spirit enabled.
 
-Do not run self-play tuning until scorer parity passes against at least one Side A 2p BGA
-final-score fixture. Use [Scorer validation](./Scorer%20validation.md) first.
+Do not run self-play tuning until scorer parity passes against Side A 2p BGA final-score fixtures.
+Minimum gate: one final/post-game fixture with exact BGA totals. Better gate: 3-5 finals covering
+high/low river use, several completed animal cards, and at least one Spirit card score.
 
 ## Current Weight Schema
 
@@ -47,3 +48,9 @@ chosen `weights.json`.
 - Fitness: `score_self - score_opp`.
 - Start with grid/CMA-ES over cheap eval weights, then add richer feature weights only after scorer
   parity and replay tests are stable.
+
+## Hardware Notes
+
+Intel 12600K / 32 GB RAM is enough for background CPU self-play. Use most P-cores first, keep memory
+bounded by streaming match summaries to JSONL, and checkpoint candidate weights regularly. AMD GPU is
+not useful for current tree-search/eval-weight tuning plan.

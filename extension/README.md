@@ -33,3 +33,12 @@ cargo run -p harmonies-service
 - Sends normalized snapshot to local Rust service when available.
 - Falls back to mock recommendation when local service is unavailable.
 - Never clicks, never calls `ajaxcall`, never sends BGA action requests.
+
+## Safety Check
+
+```powershell
+python -m tools.extension_safety_check
+```
+
+The check fails on synthetic clicks/events, BGA action helpers, non-local advisor endpoints, and
+unexpected manifest permissions.

@@ -29,12 +29,15 @@
 - Golden scorer tests now cover Side A branching river, fields, mountains, buildings, Side B islands,
   and spirit scoring.
 - Card matcher tests now cover all six rotations, no mirror match, building alias, and catalog cube-target invariants.
+- Extension read-only safety checker now scans JS, local endpoints, and manifest permissions.
 
 ## Known Gaps
 
 - Need committed anonymized fixture corpus, not just ignored local `temp/` captures.
 - Need fixture set listed in [Snapshot QA](./Snapshot%20QA.md).
 - Need Side A 2p final-score parity fixture before training/tuning.
+- Best next user-provided evidence: Side A 2p Nature Spirit final/post-game capture with exact BGA
+  totals for both players; a near-end active-turn capture is also useful for parser/search replay.
 - Self-play simulator/CMA-ES evaluator still pending; only weight schema and candidate generation exist.
 - Early stop cancels between search phases/expansions, not inside one expensive current-turn generation.
 - Advisor now supports interleaved place/draft/settle ordering with bounded frontier search.
