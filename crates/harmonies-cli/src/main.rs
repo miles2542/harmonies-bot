@@ -2,8 +2,8 @@ use std::{fs, io::Read, path::PathBuf};
 
 use anyhow::Context;
 use harmonies_core::{
-    advise, bga::normalize_gamedatas, scoring::score_player, AdvisorRequestV1, CardCatalog,
-    EvalWeights, GameSnapshotV1,
+    advise, bga::normalize_gamedatas, run_self_play, scoring::score_player, AdvisorRequestV1,
+    CardCatalog, EvalWeights, GameSnapshotV1, SelfPlayConfig,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -17,6 +17,10 @@ fn main() -> anyhow::Result<()> {
     if matches!(args.first().map(String::as_str), Some("score")) {
         args.remove(0);
         return score_command(args);
+    }
+    if matches!(args.first().map(String::as_str), Some("self-play")) {
+        args.remove(0);
+        return self_play_command(args);
     }
 
     let mut args = args.into_iter();
@@ -101,10 +105,99 @@ fn score_command(args: Vec<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn self_play_command(args: Vec<String>) -> anyhow::Result<()> {
+    let path = args.first().map(PathBuf::from).context(
+        "usage: harmonies-cli self-play <snapshot.json> [--catalog PATH] [--weights PATH]",
+    )?;
+    let options = SelfPlayCommandOptions::parse(&args[1..])?;
+    let input =
+        fs::read_to_string(&path).with_context(|| format!("failed to read {}", path.display()))?;
+    let raw: Value = serde_json::from_str(&input).context("failed to parse snapshot JSON")?;
+    let snapshot = snapshot_from_value(raw, options.perspective.as_deref())?;
+    let catalog = load_catalog(&options.catalog_path)?;
+    let weights = options
+        .weights_path
+        .as_ref()
+        .map(load_weights)
+        .transpose()?
+        .unwrap_or_default();
+    let report = run_self_play(snapshot, &catalog, &weights, &options.config);
+    println!("{}", serde_json::to_string_pretty(&report)?);
+    Ok(())
+}
+
 #[derive(Debug)]
 struct ScoreCommandOptions {
     perspective: Option<String>,
     catalog_path: PathBuf,
+}
+
+#[derive(Debug)]
+struct SelfPlayCommandOptions {
+    perspective: Option<String>,
+    catalog_path: PathBuf,
+    weights_path: Option<PathBuf>,
+    config: SelfPlayConfig,
+}
+
+impl SelfPlayCommandOptions {
+    fn parse(args: &[String]) -> anyhow::Result<Self> {
+        let mut perspective = None;
+        let mut catalog_path = PathBuf::from("docs/cards_database.json");
+        let mut weights_path = None;
+        let mut config = SelfPlayConfig::default();
+        let mut index = 0;
+        while index < args.len() {
+            match args[index].as_str() {
+                "--perspective" => {
+                    perspective = Some(
+                        args.get(index + 1)
+                            .cloned()
+                            .context("--perspective requires an id")?,
+                    );
+                    index += 2;
+                }
+                "--catalog" => {
+                    catalog_path = args
+                        .get(index + 1)
+                        .map(PathBuf::from)
+                        .context("--catalog requires a path")?;
+                    index += 2;
+                }
+                "--weights" => {
+                    weights_path = Some(
+                        args.get(index + 1)
+                            .map(PathBuf::from)
+                            .context("--weights requires a path")?,
+                    );
+                    index += 2;
+                }
+                "--turn-budget-ms" => {
+                    config.turn_budget_ms = parse_number(args, index, "--turn-budget-ms")?;
+                    index += 2;
+                }
+                "--max-turns" => {
+                    config.max_turns = parse_number(args, index, "--max-turns")?;
+                    index += 2;
+                }
+                "--seed" => {
+                    config.seed = parse_number(args, index, "--seed")?;
+                    index += 2;
+                }
+                "--validated-scorer" => {
+                    config.scorer_validated = true;
+                    index += 1;
+                }
+                other => anyhow::bail!("unknown self-play option: {other}"),
+            }
+        }
+        Ok(Self {
+            perspective,
+            catalog_path,
+            weights_path,
+            config,
+        })
+    }
 }
 
 impl ScoreCommandOptions {
@@ -157,6 +250,17 @@ fn load_weights(path: &PathBuf) -> anyhow::Result<EvalWeights> {
     let input =
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
     serde_json::from_str(&input).context("failed to parse weights")
+}
+
+fn parse_number<T>(args: &[String], index: usize, option: &str) -> anyhow::Result<T>
+where
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+{
+    args.get(index + 1)
+        .context(format!("{option} requires a value"))?
+        .parse()
+        .map_err(|error| anyhow::anyhow!("failed to parse {option}: {error}"))
 }
 
 #[derive(Debug, Serialize)]

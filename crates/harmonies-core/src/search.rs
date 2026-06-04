@@ -3,21 +3,22 @@ use std::time::{Duration, Instant};
 mod deck;
 mod denial;
 mod refill;
-
-use serde::{Deserialize, Serialize};
+mod types;
 
 use crate::{
     advisor::{turn_step_action, MoveActionV1, MovePlanV1},
     cards::CardCatalog,
     eval::EvalWeights,
-    model::{ActiveCard, BagCounts, BoardSide, Color, GameSnapshotV1, PlayerState},
-    scoring::{score_player, ScoreBreakdown},
-    turn::{generate_current_turn_sequences, TurnSequence},
+    model::{BoardSide, GameSnapshotV1, PlayerState},
+    scoring::score_player,
+    turn::generate_current_turn_sequences,
 };
 
 use deck::{initial_unseen_standard_cards, river_after_turn_with_refills};
 use denial::apply_opponent_denial;
 use refill::candidate_refills;
+use types::{FutureState, RootCandidate};
+pub use types::{SearchOutcome, SearchProgress};
 
 const ROOT_TURN_BEAM_WIDTH: usize = 512;
 const FUTURE_TURN_BEAM_WIDTH: usize = 50;
@@ -27,42 +28,6 @@ const REFILL_SAMPLES: usize = 10;
 const CARD_REFILL_SAMPLES: usize = 4;
 const HARD_STOP_MARGIN_MS: u64 = 6_000;
 const MIN_FUTURE_EXPAND_MS: u64 = 7_000;
-
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SearchProgress {
-    pub depth_completed: usize,
-    pub nodes_evaluated: usize,
-    pub stopped_early: bool,
-}
-
-#[derive(Clone, Debug)]
-pub struct SearchOutcome {
-    pub plans: Vec<MovePlanV1>,
-    pub progress: SearchProgress,
-    pub warnings: Vec<String>,
-}
-
-#[derive(Clone)]
-struct RootCandidate {
-    group_index: usize,
-    tokens: Vec<Color>,
-    turn: TurnSequence,
-    immediate: ScoreBreakdown,
-    future_estimate: i32,
-    utility_estimate: i32,
-    opponent_denial_estimate: i32,
-}
-
-#[derive(Clone)]
-struct FutureState {
-    player: PlayerState,
-    central_groups: Vec<Vec<Color>>,
-    river_cards: Vec<ActiveCard>,
-    unseen_cards: Vec<u8>,
-    bag_counts: BagCounts,
-    score: i32,
-}
 
 pub fn search_current_player_turn_with_progress(
     snapshot: &GameSnapshotV1,
@@ -174,6 +139,9 @@ fn root_candidates(
 ) -> Vec<RootCandidate> {
     let mut roots = Vec::new();
     for (group_index, tokens) in snapshot.central_token_groups.iter().enumerate() {
+        if tokens.len() != 3 {
+            continue;
+        }
         let Some(best_turn) = generate_current_turn_sequences(
             player,
             tokens,

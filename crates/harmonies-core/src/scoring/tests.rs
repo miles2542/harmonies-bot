@@ -47,7 +47,11 @@ fn isolated_mountain_scores_zero_but_adjacent_group_scores_each_stack() {
     let player = player(vec![
         cell(0, 0, vec![Color::Mountain]),
         cell(4, 0, vec![Color::Mountain]),
-        cell(5, 0, vec![Color::Mountain, Color::Mountain, Color::Mountain]),
+        cell(
+            5,
+            0,
+            vec![Color::Mountain, Color::Mountain, Color::Mountain],
+        ),
     ]);
     assert_eq!(
         score_player(&player, BoardSide::SideA, &CardCatalog::default()).mountains,

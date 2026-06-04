@@ -30,6 +30,8 @@
   and spirit scoring.
 - Card matcher tests now cover all six rotations, no mirror match, building alias, and catalog cube-target invariants.
 - Extension read-only safety checker now scans JS, local endpoints, and manifest permissions.
+- Rust self-play simulator can replay from raw/normalized BGA snapshots and apply advisor plans with
+  token/card refills for smoke testing and future tuning.
 
 ## Known Gaps
 
@@ -38,7 +40,8 @@
 - Need Side A 2p final-score parity fixture before training/tuning.
 - Best next user-provided evidence: Side A 2p Nature Spirit final/post-game capture with exact BGA
   totals for both players; a near-end active-turn capture is also useful for parser/search replay.
-- Self-play simulator/CMA-ES evaluator still pending; only weight schema and candidate generation exist.
+- CMA-ES evaluator still pending; self-play exists as gated smoke/tuning plumbing, not validated
+  training loop.
 - Early stop cancels between search phases/expansions, not inside one expensive current-turn generation.
 - Advisor now supports interleaved place/draft/settle ordering with bounded frontier search.
 - Future search does not know exact hidden animal-card deck order; river replacements are sampled from unseen standard cards.

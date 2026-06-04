@@ -8,6 +8,7 @@ pub mod moves;
 pub mod rules;
 pub mod scoring;
 pub mod search;
+pub mod simulate;
 pub mod turn;
 
 pub use advisor::{
@@ -19,3 +20,4 @@ pub use eval::EvalWeights;
 pub use model::{
     ActiveCard, BagCounts, BoardSide, Cell, Color, Coord, GameSnapshotV1, PlayerState, Stack,
 };
+pub use simulate::{run_self_play, SelfPlayConfig, SelfPlayReport};

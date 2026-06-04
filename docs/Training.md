@@ -40,7 +40,22 @@ python -m tools.train_weights --validated-scorer --out temp\training\weight_cand
 The output is JSONL candidate weights. Later self-play will consume this schema directly and export a
 chosen `weights.json`.
 
-## Later Self-Play Plan
+## Self-Play Smoke
+
+The Rust simulator can replay from a normalized or raw BGA snapshot. Use this only for smoke tests
+until scorer parity passes.
+
+```powershell
+cargo run -q -p harmonies-cli -- self-play snapshots\raw\side-a-near-end.json `
+  --catalog docs\cards_database.json `
+  --weights docs\weights.baseline.json `
+  --max-turns 4 `
+  --turn-budget-ms 250
+```
+
+After scorer parity passes, add `--validated-scorer` and raise turn budget / turn cap for tuning.
+
+## Later Training Plan
 
 - Use Rust simulator for legal playouts.
 - Parallelize by process/thread on CPU; GPU not needed.

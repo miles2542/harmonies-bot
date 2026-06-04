@@ -241,12 +241,9 @@ mod tests {
         .unwrap();
         assert_eq!(catalog.cards.len(), 42);
         assert!(catalog.get(33).unwrap().is_spirit);
-        assert!(catalog.cards.values().all(|card| {
-            card.pattern
-                .iter()
-                .filter(|step| step.allow_cube)
-                .count()
-                == 1
-        }));
+        assert!(catalog
+            .cards
+            .values()
+            .all(|card| { card.pattern.iter().filter(|step| step.allow_cube).count() == 1 }));
     }
 }
