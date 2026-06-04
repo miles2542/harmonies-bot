@@ -116,7 +116,7 @@ fn score_fields(player: &PlayerState) -> i32 {
 fn score_buildings(cells: &HashMap<Coord, &Cell>) -> i32 {
     cells
         .values()
-        .filter(|cell| cell.stack.top() == Some(Color::Building))
+        .filter(|cell| is_building_stack(cell))
         .filter(|cell| {
             let adjacent_colors: HashSet<Color> = neighbors(cell.coord)
                 .iter()
@@ -200,6 +200,15 @@ fn is_mountain_stack(cell: &Cell) -> bool {
             .all(|token| *token == Color::Mountain)
 }
 
+fn is_building_stack(cell: &Cell) -> bool {
+    matches!(
+        cell.stack.tokens.as_slice(),
+        [Color::Building, Color::Building]
+            | [Color::Trunk, Color::Building]
+            | [Color::Mountain, Color::Building]
+    )
+}
+
 fn longest_shortest_water_path(water: &HashSet<Coord>) -> usize {
     water
         .iter()
@@ -239,7 +248,13 @@ fn score_color_groups(player: &PlayerState, color: Color, points: fn(usize) -> i
     let coords: HashSet<Coord> = player
         .cells
         .iter()
-        .filter(|cell| cell.stack.top() == Some(color))
+        .filter(|cell| {
+            if color == Color::Building {
+                is_building_stack(cell)
+            } else {
+                cell.stack.top() == Some(color)
+            }
+        })
         .map(|cell| cell.coord)
         .collect();
     connected_components(&coords)

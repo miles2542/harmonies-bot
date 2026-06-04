@@ -37,7 +37,7 @@ pub fn is_legal_stack_after_place(stack: &Stack, color: Color) -> bool {
         }
         Color::Building => matches!(
             stack.top(),
-            Some(Color::Trunk | Color::Mountain | Color::Building)
+            None | Some(Color::Trunk | Color::Mountain | Color::Building)
         ),
         Color::Field | Color::Water => stack.is_empty(),
     }
@@ -79,10 +79,11 @@ mod tests {
     }
 
     #[test]
-    fn building_needs_support() {
+    fn building_can_start_empty_and_stack_on_support() {
+        assert!(can_place(&cell(vec![]), Color::Building).is_ok());
         assert!(can_place(&cell(vec![Color::Mountain]), Color::Building).is_ok());
         assert_eq!(
-            can_place(&cell(vec![]), Color::Building),
+            can_place(&cell(vec![Color::Field]), Color::Building),
             Err(PlacementError::IllegalStack)
         );
     }

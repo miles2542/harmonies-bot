@@ -43,7 +43,7 @@ A token can only be placed if specific conditions are met.
     *   **Grey (Mountain):** Can be placed on **Empty** or on top of **Grey** (up to max height 3).
     *   **Brown (Trunk):** Can be placed on **Empty** or on top of **Brown** (up to max height 2 of Brown tokens).
     *   **Green (Tree/Foliage):** Can be placed on **Empty** (scoring as a Bush) or on top of **Brown** (max height 2 of Brown, with Green always on top). No token can be placed on top of a Green token.
-    *   **Red (Building):** MUST be placed on top of **Brown**, **Grey**, or **Red** (cannot be placed on an empty space; max height 3).
+    *   **Red (Building):** Can be placed on **Empty** or on top of **Brown**, **Grey**, or **Red** (max height 3). A single Red token is legal, but it is not a scoring Building landscape until Red is on Red/Brown/Grey.
     *   **Yellow (Field):** Can ONLY be placed on **Empty** (Max height 1).
     *   **Blue (Water):** Can ONLY be placed on **Empty** (Max height 1).
 

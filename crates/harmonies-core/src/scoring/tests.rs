@@ -104,6 +104,24 @@ fn building_needs_three_distinct_adjacent_top_colors() {
 }
 
 #[test]
+fn single_red_token_is_not_a_scoring_building() {
+    let player = player(vec![
+        cell(0, 0, vec![Color::Building]),
+        cell(1, 0, vec![Color::Field]),
+        cell(1, -1, vec![Color::Mountain]),
+        cell(0, -1, vec![Color::Trunk, Color::Foliage]),
+        cell(3, 0, vec![Color::Building, Color::Building]),
+        cell(4, 0, vec![Color::Field]),
+        cell(4, 1, vec![Color::Mountain]),
+        cell(3, -1, vec![Color::Trunk, Color::Foliage]),
+    ]);
+    assert_eq!(
+        score_player(&player, BoardSide::SideA, &CardCatalog::default()).buildings,
+        5
+    );
+}
+
+#[test]
 fn side_a_river_uses_longest_path_not_all_branching_water() {
     let player = player(vec![
         cell(0, 0, vec![Color::Water]),

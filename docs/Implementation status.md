@@ -28,6 +28,9 @@
 - `tools.score_qa --use-capture-scores` can compare against capture `scoreHints` when ids match.
 - Golden scorer tests now cover Side A branching river, fields, mountains, buildings, Side B islands,
   and spirit scoring.
+- DOM-converted Side A 2p Nature Spirit finals for matches 8, 9, and 10 now match BGA totals exactly.
+- Red placement/scoring split verified from BGA: single Red placement is legal, but Building scoring
+  requires Red on Red/Brown/Grey and 3 adjacent top colors.
 - Card matcher tests now cover all six rotations, no mirror match, building alias, and catalog cube-target invariants.
 - Extension read-only safety checker now scans JS, local endpoints, and manifest permissions.
 - Rust self-play simulator can replay from raw/normalized BGA snapshots and apply advisor plans with
@@ -37,9 +40,9 @@
 
 - Need committed anonymized fixture corpus, not just ignored local `temp/` captures.
 - Need fixture set listed in [Snapshot QA](./Snapshot%20QA.md).
-- Need Side A 2p final-score parity fixture before training/tuning.
-- Best next user-provided evidence: Side A 2p Nature Spirit final/post-game capture with exact BGA
-  totals for both players; a near-end active-turn capture is also useful for parser/search replay.
+- Need committed anonymized Side A 2p final-score fixture corpus before training/tuning.
+- Best next user-provided evidence: live active-participant Side A 2p capture before a turn starts,
+  preferably near endgame with settlement options visible.
 - CMA-ES evaluator still pending; self-play exists as gated smoke/tuning plumbing, not validated
   training loop.
 - Early stop cancels between search phases/expansions, not inside one expensive current-turn generation.

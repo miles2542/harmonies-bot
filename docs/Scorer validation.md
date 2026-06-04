@@ -93,8 +93,8 @@ their embedded board/card state:
 - `harmonies-gamedatas-1780550221825 (spectate match 4 side A 2p post game).json`:
   expected `player_1=116` green / `player_2=86` red, current 69 / 56 from embedded board.
 
-Do not run weight training until these pass or the scorer discrepancy is explained by a documented
-capture/result mismatch.
+Do not run weight training from these older captures alone. Their `gamedatas` state is stale against
+the final result. Use DOM-converted v2 captures or fresh live-table captures for parity.
 
 Result-page captures can have final `gamestate.args.result` totals while the embedded board/card
 `gamedatas` still reflects a pre-final state. When category totals imply impossible board facts
@@ -177,3 +177,28 @@ that player, not a confirmed scorer bug.
   - DOM converter parity passes exactly after two fixes:
     - BGA coordinates use odd-q column offsets, not odd-r row offsets.
     - Spirit 36 scores 3 points for trees of height 1 or 2, and 1 point for height 3.
+
+- Spectate match 9 file `1780575420889` (post-game DOM-only capture):
+  - Red/andreamonaldini/player `98816549`: terrain 10 leaf + 13 mountain + 5 field +
+    10 brick + 11 water = 49; cubes 13 + 12 + 18 + 12 = 55; total 104.
+  - Green/Luegi/player `85116272`: terrain 11 leaf + 17 mountain + 5 field + 19 water = 52;
+    cubes 12 + 10 + 4 + 10 = 36; total 88.
+  - DOM converter parity passes exactly.
+
+- Spectate match 10 file `1780575835733` (post-game DOM-only capture):
+  - Red/ages60/player `99809470`: terrain 13 leaf + 5 mountain + 5 field + 5 brick +
+    0 water = 28; cubes 14 + 5 + 14 + 17 + 18 = 68; total 96.
+  - Green/cocogil/player `95645953`: terrain 18 leaf + 6 mountain + 5 brick + 5 water = 34;
+    cubes 16 + 5 + 13 + 13 + 11 + 12 = 70; total 104.
+  - DOM converter parity passes exactly after supported-building scoring:
+    - Red placement can start on empty; BGA final board shows legal single Red tokens.
+    - A scoring Building landscape requires Red on Red/Brown/Grey plus 3 adjacent top colors.
+    - Single Red is legal terrain but scores 0 in the Building category.
+
+Current exact parity gate:
+
+```powershell
+python -m tools.score_qa temp\normalized-match8-dom.json --expected 96117860=116 --expected 85751928=113
+python -m tools.score_qa temp\normalized-match9-dom.json --expected 98816549=104 --expected 85116272=88
+python -m tools.score_qa temp\normalized-match10-dom.json --expected 99809470=96 --expected 95645953=104
+```
