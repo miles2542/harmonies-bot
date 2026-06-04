@@ -1,6 +1,8 @@
 (function harmoniesAdvisorOverlayModule() {
   const ROOT_ID = "harmonies-advisor-root";
   const HIGHLIGHT_CLASS = "harmonies-advisor-highlight";
+  const CELL_HIGHLIGHT_CLASS = "harmonies-advisor-cell-highlight";
+  const MARKER_CLASS = "harmonies-advisor-step-marker";
 
   function createOverlay() {
     const existing = document.getElementById(ROOT_ID);
@@ -50,6 +52,9 @@
         if (response.bestMove?.centralGroupId) {
           highlightCentralGroup(response.bestMove.centralGroupId);
         }
+        if (response.bestMove) {
+          highlightBoardActions(response.bestMove);
+        }
       },
     };
   }
@@ -69,8 +74,8 @@
 
   function highlightCentralGroup(groupId) {
     const selectors = [
-      `#token_group_${CSS.escape(groupId)}`,
-      `#tokens_${CSS.escape(groupId)}`,
+      `#hole-${CSS.escape(groupId)}`,
+      `[data-hole='${CSS.escape(groupId)}']`,
       `[id$='_${CSS.escape(groupId)}'].token_group`,
     ];
     for (const selector of selectors) {
@@ -82,10 +87,48 @@
     }
   }
 
+  function highlightBoardActions(bestMove) {
+    const playerId = bestMove.playerId;
+    if (!playerId) {
+      return;
+    }
+    (bestMove.actions || []).forEach((action, index) => {
+      if (!["placeToken", "settleCard"].includes(action.kind)) {
+        return;
+      }
+      const cell = findBoardCell(playerId, action.col, action.row);
+      if (!cell) {
+        return;
+      }
+      cell.classList.add(CELL_HIGHLIGHT_CLASS);
+      appendStepMarker(cell, String(index + 1), action.kind);
+    });
+  }
+
+  function findBoardCell(playerId, col, row) {
+    const cellId = `cell_${playerId}_${col}_${row}`;
+    return document.getElementById(cellId);
+  }
+
+  function appendStepMarker(cell, label, kind) {
+    let marker = cell.querySelector(`.${MARKER_CLASS}`);
+    if (!marker) {
+      marker = document.createElement("span");
+      marker.className = MARKER_CLASS;
+      marker.dataset.kind = kind;
+      cell.appendChild(marker);
+    }
+    marker.textContent = marker.textContent ? `${marker.textContent},${label}` : label;
+  }
+
   function clearHighlights() {
     document
       .querySelectorAll(`.${HIGHLIGHT_CLASS}`)
       .forEach((node) => node.classList.remove(HIGHLIGHT_CLASS));
+    document
+      .querySelectorAll(`.${CELL_HIGHLIGHT_CLASS}`)
+      .forEach((node) => node.classList.remove(CELL_HIGHLIGHT_CLASS));
+    document.querySelectorAll(`.${MARKER_CLASS}`).forEach((node) => node.remove());
   }
 
   window.HarmoniesAdvisorOverlay = { createOverlay };

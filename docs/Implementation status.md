@@ -51,6 +51,8 @@
   verifies `/ws` returns a real Side A Spirit-choice plan.
 - `tools.evaluate_weights` ranks candidate weights by validated Rust self-play fitness over tracked
   active-turn fixtures.
+- Extension overlay now highlights verified BGA central holes (`#hole-1..5`) and marks recommended
+  board cells (`#cell_<playerId>_<col>_<row>`) with action step badges.
 
 ## Known Gaps
 
@@ -65,4 +67,4 @@
 - Opponent handling is v1 heuristic only: visible current-board value for central token groups, not full opponent future search.
 - WASM runtime gate pending; native service path exists.
 - Extension uses native service when running, streaming WebSocket first; mock fallback otherwise.
-- Real BGA DOM selectors for token group highlights need snapshot/manual validation.
+- Live BGA extension visual QA still pending: confirm highlighted cells/groups align on an active table.

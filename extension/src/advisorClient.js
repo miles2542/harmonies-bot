@@ -17,8 +17,12 @@
       async getRecommendation(gamedatas, onUpdate) {
         const snapshot = window.HarmoniesBgaNormalizer.normalizeGamedatas(gamedatas);
         try {
-          const response = await requestNativeAdvisor(snapshot, onUpdate);
-          return adaptAdvisorResponse(response);
+          const response = await requestNativeAdvisor(snapshot, (partialResponse) => {
+            if (onUpdate) {
+              onUpdate(adaptAdvisorResponse(partialResponse, snapshot));
+            }
+          });
+          return adaptAdvisorResponse(response, snapshot);
         } catch (error) {
           const mock = window.HarmoniesMockAdvisor.recommend(snapshot);
           mock.status = `Mock advisor active; native service unavailable: ${error.message}`;
@@ -94,7 +98,7 @@
           activeSocket = null;
           resolve(message.response);
         } else if (onUpdate) {
-          onUpdate(adaptAdvisorResponse(message.response));
+          onUpdate(message.response);
         }
       });
       socket.addEventListener("error", () => {
@@ -116,15 +120,17 @@
     });
   }
 
-  function adaptAdvisorResponse(response) {
+  function adaptAdvisorResponse(response, snapshot) {
     const best = response.bestMoves?.[0] || null;
     const progress = response.progress || {};
     return {
       status: statusText(response, progress),
       bestMove: best
         ? {
+            playerId: snapshot?.perspectivePlayerId || "",
             centralGroupId: String(best.centralGroupIndex + 1),
             title: `Take group ${best.centralGroupIndex + 1}; utility ${best.utilityEstimate ?? best.scoreEstimate}`,
+            actions: best.orderedActions || [],
             steps: actionSteps(best).concat(scoreSteps(best)),
           }
         : null,
