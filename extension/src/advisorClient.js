@@ -160,6 +160,9 @@
             playerId: snapshot?.perspectivePlayerId || "",
             centralGroupId: String(best.centralGroupIndex + 1),
             title: `Take group ${best.centralGroupIndex + 1}; utility ${best.utilityEstimate ?? best.scoreEstimate}; future ${best.scoreEstimate}`,
+            utilityEstimate: best.utilityEstimate ?? best.scoreEstimate ?? 0,
+            futureEstimate: best.scoreEstimate ?? 0,
+            denialEstimate: best.opponentDenialEstimate ?? 0,
             actions: best.orderedActions || [],
             steps: actionSteps(best).concat(scoreSteps(best)),
           }

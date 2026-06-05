@@ -81,6 +81,7 @@
         };
         plans.push(plan);
         root.querySelector(".harmonies-advisor-plans").appendChild(renderPlan(plan, selectPlan));
+        updateBestPlanBadges();
         if (!selectedPlanKey) {
           selectPlan(plan.key);
         }
@@ -103,6 +104,26 @@
       });
       clearVisualLayer();
       drawPlanOverlays(plan.move);
+    }
+
+    function updateBestPlanBadges() {
+      const best = plans
+        .slice()
+        .sort((left, right) => {
+          const utilityDiff = (right.move.utilityEstimate || 0) - (left.move.utilityEstimate || 0);
+          if (utilityDiff !== 0) {
+            return utilityDiff;
+          }
+          return right.index - left.index;
+        })[0];
+      root.querySelectorAll(".harmonies-advisor-plan").forEach((section) => {
+        const isBest = best && section.dataset.planKey === best.key;
+        section.classList.toggle("is-best-so-far", Boolean(isBest));
+        const badge = section.querySelector(".harmonies-advisor-best-badge");
+        if (badge) {
+          badge.textContent = isBest ? "Best so far" : "";
+        }
+      });
     }
   }
 
@@ -130,6 +151,8 @@
     title.type = "button";
     title.className = "harmonies-advisor-plan-title";
     title.textContent = `${plan.label}: ${plan.move.title}`;
+    const badge = document.createElement("span");
+    badge.className = "harmonies-advisor-best-badge";
     const select = document.createElement("button");
     select.type = "button";
     select.className = "harmonies-advisor-plan-select";
@@ -158,7 +181,7 @@
     }
     title.addEventListener("click", () => section.classList.toggle("is-open"));
     select.addEventListener("click", () => onSelect(plan.key));
-    header.append(title, select);
+    header.append(title, badge, select);
     section.append(header, body);
     return section;
   }
@@ -233,6 +256,9 @@
       }
       addRectOverlay(cell, "harmonies-advisor-cell-ring");
       addStepMarker(cell, String(index + 1), action.kind);
+      if (action.kind === "settleCard") {
+        drawSettlementLink(action, cell);
+      }
     });
   }
 
@@ -241,9 +267,37 @@
     return document.getElementById(cellId);
   }
 
+  function drawSettlementLink(action, cell) {
+    const card = findCard(action);
+    if (!card) {
+      return;
+    }
+    addRectOverlay(card, "harmonies-advisor-card-ring");
+    addArrowOverlay(card, cell, String(action.typeArg ?? action.type_arg ?? ""));
+  }
+
+  function findCard(action) {
+    const typeArg = action.typeArg ?? action.type_arg;
+    const cardId = action.cardId ?? action.card_id;
+    const selectors = [
+      typeArg ? `#card_${CSS.escape(String(typeArg))}` : "",
+      typeArg ? `#card-${CSS.escape(String(typeArg))}` : "",
+      cardId ? `[data-card-id='${CSS.escape(String(cardId))}']` : "",
+      cardId ? `[data-cardid='${CSS.escape(String(cardId))}']` : "",
+      typeArg ? `[data-type-arg='${CSS.escape(String(typeArg))}']` : "",
+    ].filter(Boolean);
+    for (const selector of selectors) {
+      const target = document.querySelector(selector);
+      if (target && isVisibleRect(target.getBoundingClientRect())) {
+        return target;
+      }
+    }
+    return null;
+  }
+
   function addRectOverlay(target, className) {
     const rect = target.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) {
+    if (!isVisibleRect(rect)) {
       return;
     }
     const overlay = document.createElement("div");
@@ -257,7 +311,7 @@
 
   function addStepMarker(cell, label, kind) {
     const rect = cell.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) {
+    if (!isVisibleRect(rect)) {
       return;
     }
     const marker = document.createElement("span");
@@ -267,6 +321,62 @@
     marker.style.left = `${rect.left + window.scrollX + rect.width - 16}px`;
     marker.style.top = `${rect.top + window.scrollY + 4}px`;
     visualLayer().appendChild(marker);
+  }
+
+  function addArrowOverlay(fromElement, toElement, label) {
+    const from = fromElement.getBoundingClientRect();
+    const to = toElement.getBoundingClientRect();
+    if (!isVisibleRect(from) || !isVisibleRect(to)) {
+      return;
+    }
+    const start = {
+      x: from.left + window.scrollX + from.width / 2,
+      y: from.top + window.scrollY + from.height / 2,
+    };
+    const end = {
+      x: to.left + window.scrollX + to.width / 2,
+      y: to.top + window.scrollY + to.height / 2,
+    };
+    const padding = 28;
+    const left = Math.min(start.x, end.x) - padding;
+    const top = Math.min(start.y, end.y) - padding;
+    const width = Math.abs(start.x - end.x) + padding * 2;
+    const height = Math.abs(start.y - end.y) + padding * 2;
+    const sx = start.x - left;
+    const sy = start.y - top;
+    const ex = end.x - left;
+    const ey = end.y - top;
+    const cx = (sx + ex) / 2;
+    const cy = Math.min(sy, ey) - Math.max(24, Math.abs(sx - ex) * 0.08);
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const markerId = `harmonies-advisor-arrowhead-${Math.random().toString(36).slice(2)}`;
+    svg.classList.add("harmonies-advisor-settle-arrow");
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.style.left = `${left}px`;
+    svg.style.top = `${top}px`;
+    svg.style.width = `${width}px`;
+    svg.style.height = `${height}px`;
+    svg.innerHTML = `
+      <defs>
+        <marker id="${markerId}" markerWidth="8" markerHeight="8" refX="6" refY="3.5" orient="auto">
+          <path d="M0,0 L7,3.5 L0,7 Z" class="harmonies-advisor-arrow-head"></path>
+        </marker>
+      </defs>
+      <path class="harmonies-advisor-arrow-path" d="M ${sx} ${sy} Q ${cx} ${cy} ${ex} ${ey}" marker-end="url(#${markerId})"></path>
+    `;
+    if (label) {
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.classList.add("harmonies-advisor-arrow-label");
+      text.setAttribute("x", String(cx));
+      text.setAttribute("y", String(cy - 4));
+      text.textContent = `card ${label} cube`;
+      svg.appendChild(text);
+    }
+    visualLayer().appendChild(svg);
+  }
+
+  function isVisibleRect(rect) {
+    return rect.width > 0 && rect.height > 0;
   }
 
   function visualLayer() {

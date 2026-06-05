@@ -73,6 +73,10 @@
   a plan switches the visual indicators to that plan.
 - Plan visual indicators are document-anchored absolute overlays, so they stay on board cells/groups
   during page scrolling.
+- Plan sections now mark the highest-utility plan seen so far with a `Best so far` badge. At a fixed
+  user cutoff, follow that badge unless choosing a simpler plan intentionally.
+- Settlement steps now draw a low-opacity card-to-cell arrow from `#card_<typeArg>` to the target cell,
+  plus a subtle card ring, so the user can see which card cube to settle without DevTools.
 - Nature Spirit choice parsing is now gated by active-player `gamestate.args.canChooseSpirit` plus
   `actChooseSpirit`/`chooseSpirit`, avoiding stale `chooseSpirit` plans after the first-turn window.
 - Group inspector labels now use a separate fixed overlay layer and stricter visible-DOM token reads,
@@ -96,3 +100,19 @@
 - Live BGA spectator QA pending for the new frozen Analyze flow: confirm active-player perspective,
   central-group parsing, non-mutating overlays, and progressive depth tiers on cheap spectated games
   before spending time on real active matches.
+- Current CPU utilization is still low on i5-12600K despite `HARMONIES_SEARCH_THREADS=12`.
+  Root and future-frontier parallelism exist, but search fan-out is likely still too narrow after
+  pruning. Next work should benchmark node counts/frontier sizes and tune branch/refill/depth knobs
+  before assuming a threading bug.
+
+## Next Phases
+
+1. Benchmark/instrument search on spectated active-turn snapshots: elapsed per phase, root count,
+   future frontier sizes, nodes per depth, Rayon thread count.
+2. Parameter sweep: root beam, future turn beam, branch width, token refill samples, card refill
+   samples, depth/time budget. Track p50/p95 and best-plan stability.
+3. Tune weights using validated fixtures and self-play candidates, then compare against baseline
+   on the same active-turn corpus.
+4. Expand fixture corpus with cheap spectated active turns that include settlement opportunities,
+   late-game near-full boards, and first-turn Spirit choices.
+5. Final active-game QA once spectator parsing/UI and benchmarked parameters are stable.
