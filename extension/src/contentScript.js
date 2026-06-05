@@ -71,8 +71,10 @@
     if (!isAnalyzing && !activeStateKey) {
       const perspective = resolveAnalysisPerspective(gamedatas, latestPayload);
       overlay.setStatus(
-        perspective
-          ? `Ready to analyze active player ${perspective}`
+        perspective.playerId
+          ? `Ready to analyze ${perspective.label}`
+          : perspective.reason
+            ? perspective.reason
           : "Waiting for active player state",
       );
     }
@@ -85,11 +87,12 @@
       overlay.setStatus("Waiting for Harmonies table");
       return;
     }
-    const playerId = resolveAnalysisPerspective(gamedatas, payload);
-    if (!playerId) {
-      overlay.setStatus("Active player not detected");
+    const perspective = resolveAnalysisPerspective(gamedatas, payload);
+    if (!perspective.playerId) {
+      overlay.setStatus(perspective.reason || "Active player not detected");
       return;
     }
+    const playerId = perspective.playerId;
     const centralTokenGroups = readDomCentralTokenGroups();
     const stateKey = buildStateKey(gamedatas, playerId, centralTokenGroups);
     if (!stateKey) {
@@ -125,21 +128,52 @@
     }
   }
 
-  function isOurActionPhase(gamedatas, playerId) {
-    return String(gamedatas?.gamestate?.active_player || "") === String(playerId);
-  }
-
   function resolveAnalysisPerspective(gamedatas, payload) {
     const players = gamedatas?.players || {};
-    const activePlayer = String(gamedatas?.gamestate?.active_player || "");
-    if (activePlayer && players[activePlayer]) {
-      return activePlayer;
-    }
     const participant = getCurrentPlayerId(gamedatas, payload);
-    if (participant && players[participant] && isOurActionPhase(gamedatas, participant)) {
-      return participant;
+    const activePlayer = String(gamedatas?.gamestate?.active_player || "");
+    const activeName = playerLabel(gamedatas, activePlayer);
+
+    if (!payload?.isSpectator && participant && players[participant]) {
+      if (String(activePlayer) === String(participant)) {
+        return {
+          playerId: participant,
+          label: playerLabel(gamedatas, participant),
+          mode: "participant",
+        };
+      }
+      return {
+        playerId: "",
+        label: "",
+        mode: "participant",
+        reason: activePlayer
+          ? `Waiting for your turn; active: ${activeName}`
+          : "Waiting for active player state",
+      };
     }
-    return Object.keys(players)[0] || "";
+
+    if (activePlayer && players[activePlayer]) {
+      return {
+        playerId: activePlayer,
+        label: `${activeName} (spectator)`,
+        mode: "spectator",
+      };
+    }
+
+    const firstPlayer = Object.keys(players)[0] || "";
+    return firstPlayer
+      ? {
+          playerId: firstPlayer,
+          label: `${playerLabel(gamedatas, firstPlayer)} (fallback)`,
+          mode: "fallback",
+        }
+      : { playerId: "", label: "", mode: "unknown", reason: "Waiting for active player state" };
+  }
+
+  function playerLabel(gamedatas, playerId) {
+    const player = gamedatas?.players?.[playerId];
+    const name = player?.name || player?.player_name;
+    return name ? `${name} (${playerId})` : String(playerId || "unknown");
   }
 
   function buildStateKey(gamedatas, playerId, centralTokenGroups = readDomCentralTokenGroups()) {

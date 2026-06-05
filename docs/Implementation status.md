@@ -81,6 +81,8 @@
   `actChooseSpirit`/`chooseSpirit`, avoiding stale `chooseSpirit` plans after the first-turn window.
 - Group inspector labels now use a separate fixed overlay layer and stricter visible-DOM token reads,
   so inspector QA does not move or restyle central tokens.
+- Active participant Analyze now only runs for the current user's own active turn. Spectator mode still
+  analyzes the active player. Panel status includes player name plus id when BGA exposes the name.
 
 ## Known Gaps
 
@@ -100,8 +102,9 @@
 - Opponent handling is v1 heuristic only: visible current-board value for central token groups, not full opponent future search.
 - WASM runtime gate pending; native service path exists.
 - Extension uses native service when running, streaming WebSocket first; mock fallback otherwise.
-- Live BGA extension visual QA still pending after manual-flow patch: confirm DOM group inspector,
-  highlighted cells/groups, and first-turn Spirit plan on active table.
+- Live BGA extension visual QA still pending after participant-perspective patch: confirm active
+  participant Analyze never draws opponent-board indicators, while spectate Analyze still targets the
+  active player.
 - Live BGA spectator QA pending for the new frozen Analyze flow: confirm active-player perspective,
   central-group parsing, non-mutating overlays, and progressive depth tiers on cheap spectated games
   before spending time on real active matches.
