@@ -159,7 +159,7 @@
         ? {
             playerId: snapshot?.perspectivePlayerId || "",
             centralGroupId: String(best.centralGroupIndex + 1),
-            title: `Take group ${best.centralGroupIndex + 1}; utility ${best.utilityEstimate ?? best.scoreEstimate}`,
+            title: `Take group ${best.centralGroupIndex + 1}; utility ${best.utilityEstimate ?? best.scoreEstimate}; future ${best.scoreEstimate}`,
             actions: best.orderedActions || [],
             steps: actionSteps(best).concat(scoreSteps(best)),
           }
@@ -203,11 +203,19 @@
 
   function scoreSteps(move) {
     const breakdown = move.scoreBreakdown || {};
+    const immediateTotal =
+      (breakdown.trees || 0) +
+      (breakdown.mountains || 0) +
+      (breakdown.fields || 0) +
+      (breakdown.buildings || 0) +
+      (breakdown.water || 0) +
+      (breakdown.animals || 0) +
+      (breakdown.spirits || 0);
     return [
-      `Estimates: self ${move.scoreEstimate || 0} VP, denial ${move.opponentDenialEstimate || 0}, utility ${
+      `Search estimate: future self ${move.scoreEstimate || 0} VP, denial ${move.opponentDenialEstimate || 0}, utility ${
         move.utilityEstimate || move.scoreEstimate || 0
       }`,
-      `Score: trees ${breakdown.trees || 0}, mountains ${breakdown.mountains || 0}, fields ${
+      `Immediate score if followed now: ${immediateTotal} VP; trees ${breakdown.trees || 0}, mountains ${breakdown.mountains || 0}, fields ${
         breakdown.fields || 0
       }, buildings ${breakdown.buildings || 0}, water ${breakdown.water || 0}, animals ${
         breakdown.animals || 0
