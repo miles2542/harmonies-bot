@@ -17,6 +17,10 @@ python tools\snapshot_qa.py --json --compare snapshots\raw\turn.json snapshots\n
 python -m tools.score_qa snapshots\raw\final.json --expected player_1=84 --expected player_2=79
 python -m tools.score_qa snapshots\raw\final-capture.json --use-capture-scores
 python -m tools.score_fixture_corpus
+python -m tools.summarize_capture_visible_state temp\snapshots\capture.json
+python -m tools.build_advisor_request_fixture temp\snapshots\capture.json `
+  fixtures\advisor_requests\case_request.json
+python -m tools.validate_advisor_plan_legality
 ```
 
 Default output is human-readable. `--json` output is intended for fixture logs and `jq`.
@@ -36,7 +40,7 @@ Default output is human-readable. `--json` output is intended for fixture logs a
 
 - Capture exact `window.gameui.gamedatas` after BGA UI finishes updating.
 - Optional helper: install `tools\bga_harmonies_capture.user.js` in ScriptCat/Tampermonkey and
-  click `Download`.
+  click `Download`. Current panel should show `v0.3.3`; stale panels are replaced automatically.
 - Record table context separately: date, player count, board side, turn phase, active player,
   notable action just completed.
 - Anonymize before sharing or committing fixture data:
@@ -47,6 +51,11 @@ python tools\snapshot_anonymizer.py snapshots\raw\turn.json snapshots\raw\turn.a
 
 - Normalize anonymized snapshot with explicit perspective player when possible.
 - Run snapshot QA against raw/anonymized input and normalized output.
+- For advisor legality fixtures, prefer `tools.build_advisor_request_fixture` over manual JSON edits.
+  It converts visible DOM captures when present and anonymizes player ids in `GameSnapshotV1`.
+- Run `tools.validate_advisor_plan_legality` after adding active-turn request fixtures. It replays
+  group selection, token placement, card draft, settlement source, remaining cubes, locked cells,
+  and catalog pattern validity.
 - Save QA JSON beside fixture or in `logs\snapshot_qa\`.
 - Do not commit personal names, avatars, table IDs, chat, or unrelated BGA payload.
 - For final-score parity, record BGA final totals manually if capture `scoreHints` are empty or use
@@ -68,6 +77,8 @@ python tools\snapshot_anonymizer.py snapshots\raw\turn.json snapshots\raw\turn.a
 - Side B snapshot to verify board-side normalization.
 - Numeric BGA player IDs mapped to anonymized `player_1` style IDs.
 - Near-endgame snapshot with low `emptyHexes`.
+- Active turn with full 4-card hand before any action.
+- Active turn after that same player previously completed a card and freed a hand slot.
 - Negative fixture with missing or malformed optional fields for QA warnings.
 - Side A 2p final/post-game snapshot with exact BGA final totals for both players.
 

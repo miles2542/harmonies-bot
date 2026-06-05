@@ -93,6 +93,12 @@
   arrays, ignore stale no-cube Spirit offers after the choice window, and card arrows find DOM cards by
   BGA per-game `cardId` while labels still show persistent `typeArg`. Regression tests and
   `tools.validate_advisor_plan_legality` cover unavailable/completed/undrafted/over-count settlements.
+- Match 14 active-turn captures are now durable anonymized advisor request fixtures:
+  `sidea_2p_nature_match14_full_hand_request.json` and
+  `sidea_2p_nature_match14_after_completion_near_end_request.json`. They cover full-hand
+  draft exclusion and freed-slot near-end search legality.
+- `tools.build_advisor_request_fixture` converts capture/normalized snapshots into anonymized
+  `AdvisorRequestV1` fixtures so future card-source bugs can be reproduced offline.
 - Need broader fixture set listed in [Snapshot QA](./Snapshot%20QA.md) beyond final-score parity.
 - Need more settlement-available active-turn fixtures if BGA exposes edge cases, but match 12 already
   covers early Spirit choice plus late active-turn search smoke.

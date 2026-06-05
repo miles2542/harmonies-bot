@@ -97,7 +97,7 @@ Live spectate QA on snapshot temp\\snapshots\\harmonies-gamedatas-1780652789428.
 - Extension now reads `VisibleStateV1` at Analyze click and freezes that state for the advisor run.
 - `VisibleStateV1` uses visible DOM for central groups, player boards, active hand cards, completed cards, river cards, Spirit choices, and cube counts when reliable.
 - `gamedatas` remains fallback only; normalizer does not let `domBoards=true/domCards=false` empty card arrays override card state.
-- Capture userscript version `0.3.2` fixes a regression where BGA `.harmonies-card` elements were filtered out as capture UI.
+- Capture userscript version `0.3.3` fixes a regression where BGA `.harmonies-card` elements were filtered out as capture UI and hardens Copy/Download button feedback.
 - Capture converter uses `visibleStateV1` when reliable and falls back to raw `domSnapshot` card extraction if `visibleStateV1.reliability.domCards=false`.
 - Validator now replays group selection, token placement, draft, settlement source, remaining cubes, locked cells, and catalog pattern validity.
 
@@ -107,14 +107,18 @@ Verified captures:
 - Match 14 captures `1780660938281`, `1780661142713`, `1780661303535` pass legality replay after raw DOM card fallback.
 - `1780660938281` confirms full 4-card hand case; active cards from visible DOM are `1/type17`, `3/type30`, `24/type3`, `32/type24`, completed Spirit `21/type39`.
 - `1780661142713` confirms freed-slot/near-end case; active player `97974965`, active cards `4/type26`, `29/type19`, `30/type7`, completed `13/type31`, `16/type8`, `27/type36`.
+- New durable advisor request fixtures:
+  - `fixtures/advisor_requests/sidea_2p_nature_match14_full_hand_request.json`.
+  - `fixtures/advisor_requests/sidea_2p_nature_match14_after_completion_near_end_request.json`.
+- `python -m tools.validate_advisor_plan_legality` now includes match 12 and match 14 request fixtures and passes.
+- `tools.build_advisor_request_fixture` builds anonymized `AdvisorRequestV1` fixtures from capture JSON or normalized snapshots.
 
 Next safe work before tuning:
 
-- Reload extension and ScriptCat with latest files when user returns; new capture version should report `domCards=true`.
+- Reload extension and ScriptCat with latest files when user returns; new capture panel should show `v0.3.3` and new captures should report `domCards=true`.
 - `tools/summarize_capture_visible_state.py <captures...>` prints compact active-player/card/river/central summaries for quick QA.
 - `tools.score_qa` now auto-converts capture JSON through DOM/visible-state normalizer before scoring, avoiding false failures from stale raw `gamedatas`.
 - Match 14 post-game capture `1780661303535` scorer parity passes via `python -m tools.score_qa ... --use-capture-scores` (`90`, `102`).
 - Extension now refuses manual Analyze in `gameEnd` state (`Game ended; advisor disabled`).
 - Split oversized `tools/bga_harmonies_capture.user.js` and `tools/dom_capture_to_snapshot.py` when practical; both exceed preferred 300-400 lines.
-- Add a JS fixture/unit test for normalizer card fallback guard if local test harness exists or can be small.
-- Do not start weight tuning until one live/spectate UI test confirms arrows and panel cards match visible active hand with capture `0.3.2`.
+- Do not start weight tuning until one live/spectate UI test confirms arrows and panel cards match visible active hand with capture `0.3.3`.
