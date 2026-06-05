@@ -20,6 +20,7 @@ python -m tools.score_fixture_corpus
 python -m tools.summarize_capture_visible_state temp\snapshots\capture.json
 python -m tools.build_advisor_request_fixture temp\snapshots\capture.json `
   fixtures\advisor_requests\case_request.json
+python -m tools.check_advisor_request_fixtures
 python -m tools.validate_advisor_plan_legality
 python -m tools.benchmark_cli --threads 12 --time-budget-ms 30000
 python -m tools.benchmark_cli fixtures\advisor_requests\case_request.json --threads 12 `
@@ -64,6 +65,8 @@ python tools\snapshot_anonymizer.py snapshots\raw\turn.json snapshots\raw\turn.a
 - Run `tools.validate_advisor_plan_legality` after adding active-turn request fixtures. It replays
   group selection, token placement, card draft, settlement source, remaining cubes, locked cells,
   and catalog pattern validity.
+- Run `tools.check_advisor_request_fixtures` to catch unredacted player metadata, malformed
+  `bagCounts`, malformed central groups, overfull active hands, and broken perspective/active ids.
 - Save QA JSON beside fixture or in `logs\snapshot_qa\`.
 - Do not commit personal names, avatars, table IDs, chat, or unrelated BGA payload.
 - For final-score parity, record BGA final totals manually if capture `scoreHints` are empty or use

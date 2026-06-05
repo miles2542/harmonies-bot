@@ -114,6 +114,8 @@ Verified captures:
   - `fixtures/advisor_requests/sidea_2p_nature_match14_after_completion_near_end_request.json`.
 - `python -m tools.validate_advisor_plan_legality` now includes match 12 and match 14 request fixtures and passes.
 - `tools.build_advisor_request_fixture` builds anonymized `AdvisorRequestV1` fixtures from capture JSON or normalized snapshots.
+- `tools.check_advisor_request_fixtures` validates tracked request fixtures for anonymized player ids,
+  no player metadata, non-zero `bagCounts`, five complete central groups, and hand-limit sanity.
 - `tools.benchmark_cli` now benchmarks one or more advisor request fixtures with optional `--threads`
   and `--time-budget-ms`, reporting wall/engine ms, nodes, completed depth, top group stability.
 - `tools.sweep_search_params` runs named parameter candidates over request fixtures and writes

@@ -99,6 +99,8 @@
   draft exclusion and freed-slot near-end search legality.
 - `tools.build_advisor_request_fixture` converts capture/normalized snapshots into anonymized
   `AdvisorRequestV1` fixtures so future card-source bugs can be reproduced offline.
+- `tools.check_advisor_request_fixtures` validates tracked request fixtures for anonymized player ids,
+  no player metadata, non-zero `bagCounts`, five complete central groups, and active-card hand limit.
 - Need broader fixture set listed in [Snapshot QA](./Snapshot%20QA.md) beyond final-score parity.
 - Need more settlement-available active-turn fixtures if BGA exposes edge cases, but match 12 already
   covers early Spirit choice plus late active-turn search smoke.
