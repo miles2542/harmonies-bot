@@ -47,7 +47,7 @@
       boardSide: parseBoardSide(gamedatas.boardSide),
       players,
       centralTokenGroups,
-      riverCards: parseCards(gamedatas.river, new Map(), false),
+      riverCards: parseCards(gamedatas.river, new Map(), false, { locations: ["river"] }),
       bagCounts: inferBagCounts(players, centralTokenGroups, gamedatas.remainingTokens),
       cardsCatalogVersion: stringValue(gamedatas.version) || "bga",
     };
@@ -70,19 +70,30 @@
         lockedByCube: Boolean((key && playerCubeLocations.has(key)) || playerCubeCoords.has(coordKey)),
       };
     });
-    const activeCards = parseCards(player.boardAnimalCards, cardCubeCounts, false);
-    const playerSpirits = parsePlayerSpirits(gamedatas.spiritsCards, playerId, cardCubeCounts, gamedatas, playerIds);
+    const activeCards = parseCards(player.boardAnimalCards, cardCubeCounts, false, {
+      locations: bgaIds.map((id) => `board${id}`),
+    });
+    const playerSpirits = parsePlayerSpirits(
+      gamedatas.spiritsCards,
+      playerId,
+      bgaIds,
+      cardCubeCounts,
+      gamedatas,
+      playerIds,
+    );
     activeCards.push(...playerSpirits);
     const spiritCardChoices = playerSpirits.length
       ? []
-      : parsePlayerSpiritChoices(gamedatas.spiritsCards, playerId, cardCubeCounts, gamedatas, playerIds);
+      : parsePlayerSpiritChoices(gamedatas.spiritsCards, playerId, bgaIds, cardCubeCounts, gamedatas, playerIds);
 
     return {
       playerId,
       cells,
       activeCards,
       spiritCardChoices,
-      completedCards: parseCards(player.doneAnimalCards, cardCubeCounts, true),
+      completedCards: parseCards(player.doneAnimalCards, cardCubeCounts, true, {
+        locations: bgaIds.map((id) => `done${id}`),
+      }),
       emptyHexes: clampU8(numberValue(player.emptyHexes) || 0),
     };
   }
@@ -139,16 +150,13 @@
         }
       });
     }
-    ["boardAnimalCards", "doneAnimalCards"].forEach((field) => {
-      arrayValue(player[field]).forEach((card) => {
-        const location = stringValue(card.location);
-        if (location?.startsWith("board")) {
-          ids.push(location.slice("board".length));
-        }
-        if (location?.startsWith("done")) {
-          ids.push(location.slice("done".length));
-        }
-      });
+    const cubeLocations = new Set();
+    collectSinglePlayerCubeLocations(player, cubeLocations);
+    cubeLocations.forEach((location) => {
+      const playerId = cellKeyPlayerId(location);
+      if (playerId) {
+        ids.push(playerId);
+      }
     });
     return Array.from(new Set(ids.filter(Boolean))).sort();
   }
@@ -215,12 +223,16 @@
     return arrayValue(value).map(tokenColor).filter(Boolean);
   }
 
-  function parseCards(value, cubeCounts, completed) {
+  function parseCards(value, cubeCounts, completed, options = {}) {
+    const locations = options.locations || [];
     return arrayValue(value)
       .map((card) => {
         const cardId = numberValue(card.id);
         const typeArg = numberValue(card.type_arg);
         if (!Number.isFinite(cardId) || !Number.isFinite(typeArg)) {
+          return null;
+        }
+        if (!cardLocationMatches(card, locations)) {
           return null;
         }
         return {
@@ -233,35 +245,35 @@
       .filter(Boolean);
   }
 
-  function parsePlayerSpirits(value, playerId, cubeCounts, gamedatas, playerIds) {
+  function parsePlayerSpirits(value, playerId, bgaIds, cubeCounts, gamedatas, playerIds) {
     const inChoiceState = isSpiritChoiceState(gamedatas, playerId, playerIds);
     return arrayValue(value)
-      .filter((card) => String(card.location_arg) === playerId)
+      .filter((card) => valueMatchesAnyId(card.location_arg, bgaIds))
       .map((card) => {
         const cardId = numberValue(card.id);
         const typeArg = numberValue(card.type_arg);
         if (!Number.isFinite(cardId) || !Number.isFinite(typeArg)) {
           return null;
         }
-        if (inChoiceState && !cubeCounts.has(cardId)) {
+        if (inChoiceState || !cubeCounts.has(cardId)) {
           return null;
         }
         return {
           cardId,
           typeArg,
-          remainingCubes: cubeCounts.get(cardId) ?? 1,
+          remainingCubes: cubeCounts.get(cardId),
           isSpirit: true,
         };
       })
       .filter(Boolean);
   }
 
-  function parsePlayerSpiritChoices(value, playerId, cubeCounts, gamedatas, playerIds) {
+  function parsePlayerSpiritChoices(value, playerId, bgaIds, cubeCounts, gamedatas, playerIds) {
     if (!isSpiritChoiceState(gamedatas, playerId, playerIds)) {
       return [];
     }
     return arrayValue(value)
-      .filter((card) => String(card.location_arg) === playerId)
+      .filter((card) => valueMatchesAnyId(card.location_arg, bgaIds))
       .map((card) => {
         const cardId = numberValue(card.id);
         const typeArg = numberValue(card.type_arg);
@@ -302,6 +314,14 @@
       return cubeCounts.get(cardId);
     }
     return arrayValue(card.pointLocations).length;
+  }
+
+  function cardLocationMatches(card, locations) {
+    if (!locations.length) {
+      return true;
+    }
+    const location = stringValue(card.location);
+    return !location || locations.includes(location);
   }
 
   function countCardCubes(value) {
@@ -388,6 +408,14 @@
 
   function normalizePlayerId(rawId, mappedIds) {
     return rawId ? mappedIds.get(String(rawId)) || String(rawId) : "";
+  }
+
+  function valueMatchesAnyId(value, ids) {
+    if (value === undefined || value === null) {
+      return false;
+    }
+    const raw = String(value);
+    return ids.some((id) => raw === id);
   }
 
   function playerOrderIdForPlayer(gamedatas, player) {

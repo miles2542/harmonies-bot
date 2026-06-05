@@ -311,7 +311,7 @@ fn chosen_spirit_with_cube_is_active_card() {
 }
 
 #[test]
-fn unchosen_spirit_is_not_choice_after_choice_window() {
+fn stale_no_cube_spirit_offer_is_ignored_after_choice_window() {
     let raw = json!({
         "version": "230603",
         "boardSide": "sideA",
@@ -337,6 +337,89 @@ fn unchosen_spirit_is_not_choice_after_choice_window() {
         "cubesOnAnimalCards": []
     });
     let snapshot = normalize_gamedatas(&raw, Some("p1")).unwrap();
-    assert_eq!(snapshot.players[0].active_cards.len(), 1);
+    assert!(snapshot.players[0].active_cards.is_empty());
     assert!(snapshot.players[0].spirit_card_choices.is_empty());
+}
+
+#[test]
+fn selected_spirit_in_hand_is_active_without_top_level_spirits() {
+    let raw = json!({
+        "version": "230603",
+        "boardSide": "sideA",
+        "hexes": [],
+        "gamestate": {"active_player": "p1"},
+        "players": {
+            "p1": {
+                "emptyHexes": 0,
+                "tokensOnBoard": {},
+                "boardAnimalCards": [
+                    {
+                        "id": 24,
+                        "type_arg": 41,
+                        "location": "boardp1",
+                        "pointLocations": [0],
+                        "isSpirit": true
+                    }
+                ],
+                "doneAnimalCards": []
+            }
+        },
+        "tokensOnCentralBoard": {},
+        "river": [],
+        "spiritsCards": [],
+        "cubesOnAnimalCards": [{"location": "card_24"}]
+    });
+    let snapshot = normalize_gamedatas(&raw, Some("p1")).unwrap();
+    assert_eq!(snapshot.players[0].active_cards.len(), 1);
+    assert_eq!(snapshot.players[0].active_cards[0].type_arg, 41);
+    assert!(snapshot.players[0].active_cards[0].is_spirit);
+}
+
+#[test]
+fn active_and_completed_cards_must_belong_to_that_player_location() {
+    let raw = json!({
+        "version": "230603",
+        "boardSide": "sideA",
+        "hexes": [],
+        "playerorder": [98395045, 9],
+        "gamestate": {"active_player": 98395045},
+        "players": {
+            "p1": {
+                "id": "p1",
+                "playerNo": 1,
+                "emptyHexes": 0,
+                "tokensOnBoard": {},
+                "boardAnimalCards": [
+                    {"id": 1, "type_arg": 8, "location": "board98395045", "pointLocations": [4]},
+                    {"id": 2, "type_arg": 9, "location": "board9", "pointLocations": [4]}
+                ],
+                "doneAnimalCards": [
+                    {"id": 3, "type_arg": 10, "location": "done98395045", "pointLocations": [4]},
+                    {"id": 4, "type_arg": 11, "location": "done9", "pointLocations": [4]}
+                ]
+            },
+            "p2": {
+                "id": "p2",
+                "playerNo": 2,
+                "emptyHexes": 0,
+                "tokensOnBoard": {},
+                "boardAnimalCards": [],
+                "doneAnimalCards": []
+            }
+        },
+        "tokensOnCentralBoard": {},
+        "river": [],
+        "spiritsCards": [],
+        "cubesOnAnimalCards": [{"location": "card_2"}]
+    });
+    let snapshot = normalize_gamedatas(&raw, Some("p1")).unwrap();
+    let player = snapshot
+        .players
+        .iter()
+        .find(|player| player.player_id == "p1")
+        .unwrap();
+    assert_eq!(player.active_cards.len(), 1);
+    assert_eq!(player.active_cards[0].card_id, 1);
+    assert_eq!(player.completed_cards.len(), 1);
+    assert_eq!(player.completed_cards[0].card_id, 3);
 }

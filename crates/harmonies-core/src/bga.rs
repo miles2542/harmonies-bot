@@ -70,7 +70,12 @@ pub fn normalize_gamedatas(
         ),
         players,
         central_token_groups,
-        river_cards: parse_cards(object.get("river"), &HashMap::new(), false),
+        river_cards: parse_cards(
+            object.get("river"),
+            &HashMap::new(),
+            false,
+            &["river".to_owned()],
+        ),
         cards_catalog_version: object
             .get("version")
             .and_then(Value::as_str)
@@ -162,16 +167,25 @@ fn normalize_player(
         })
         .collect();
 
-    let mut active_cards = parse_cards(value.get("boardAnimalCards"), &card_cube_counts, false);
+    let board_prefixes: Vec<String> = bga_ids.iter().map(|id| format!("board{id}")).collect();
+    let done_prefixes: Vec<String> = bga_ids.iter().map(|id| format!("done{id}")).collect();
+    let mut active_cards = parse_cards(
+        value.get("boardAnimalCards"),
+        &card_cube_counts,
+        false,
+        &board_prefixes,
+    );
     active_cards.extend(parse_player_spirits(
         gamedatas.get("spiritsCards"),
         player_id,
+        bga_ids,
         &card_cube_counts,
         gamedatas,
     ));
     let spirit_card_choices = parse_player_spirit_choices(
         gamedatas.get("spiritsCards"),
         player_id,
+        bga_ids,
         &card_cube_counts,
         gamedatas,
     );
@@ -181,7 +195,12 @@ fn normalize_player(
         cells,
         active_cards,
         spirit_card_choices,
-        completed_cards: parse_cards(value.get("doneAnimalCards"), &card_cube_counts, true),
+        completed_cards: parse_cards(
+            value.get("doneAnimalCards"),
+            &card_cube_counts,
+            true,
+            &done_prefixes,
+        ),
         empty_hexes: value
             .get("emptyHexes")
             .and_then(Value::as_u64)
@@ -282,6 +301,7 @@ fn parse_cards(
     value: Option<&Value>,
     cube_counts: &HashMap<u32, u8>,
     completed: bool,
+    location_prefixes: &[String],
 ) -> Vec<ActiveCard> {
     value
         .and_then(Value::as_array)
@@ -289,6 +309,9 @@ fn parse_cards(
         .flatten()
         .filter_map(|card| {
             let card_id = card.get("id")?.as_u64()? as u32;
+            if !card_location_matches(card, location_prefixes) {
+                return None;
+            }
             Some(ActiveCard {
                 card_id,
                 type_arg: card.get("type_arg")?.as_u64()? as u8,
@@ -314,6 +337,7 @@ fn parse_cards(
 fn parse_player_spirits(
     value: Option<&Value>,
     player_id: &str,
+    bga_ids: &[String],
     cube_counts: &HashMap<u32, u8>,
     gamedatas: &Value,
 ) -> Vec<ActiveCard> {
@@ -324,18 +348,15 @@ fn parse_player_spirits(
         .flatten()
         .filter(|card| {
             card.get("location_arg")
-                .map(|location| value_matches_id(location, player_id))
+                .map(|location| value_matches_any_id(location, bga_ids))
                 .unwrap_or(false)
         })
         .filter_map(|card| {
             let card_id = card.get("id")?.as_u64()? as u32;
-            let remaining_cubes = cube_counts.get(&card_id).copied().or_else(|| {
-                if in_choice_state {
-                    None
-                } else {
-                    Some(1)
-                }
-            })?;
+            if in_choice_state {
+                return None;
+            }
+            let remaining_cubes = cube_counts.get(&card_id).copied()?;
             Some(ActiveCard {
                 card_id,
                 type_arg: card.get("type_arg")?.as_u64()? as u8,
@@ -349,6 +370,7 @@ fn parse_player_spirits(
 fn parse_player_spirit_choices(
     value: Option<&Value>,
     player_id: &str,
+    bga_ids: &[String],
     cube_counts: &HashMap<u32, u8>,
     gamedatas: &Value,
 ) -> Vec<ActiveCard> {
@@ -361,7 +383,7 @@ fn parse_player_spirit_choices(
         .flatten()
         .filter(|card| {
             card.get("location_arg")
-                .map(|location| value_matches_id(location, player_id))
+                .map(|location| value_matches_any_id(location, bga_ids))
                 .unwrap_or(false)
         })
         .filter_map(|card| {
@@ -425,6 +447,16 @@ fn count_card_cubes(value: Option<&Value>) -> HashMap<u32, u8> {
     counts
 }
 
+fn card_location_matches(card: &Value, locations: &[String]) -> bool {
+    if locations.is_empty() {
+        return true;
+    }
+    let Some(location) = card.get("location").and_then(Value::as_str) else {
+        return true;
+    };
+    locations.iter().any(|expected| location == expected)
+}
+
 fn token_color(token: &Value) -> Option<Color> {
     token
         .get("type_arg")
@@ -454,6 +486,12 @@ fn value_matches_id(value: &Value, player_id: &str) -> bool {
         .map(|raw| raw == player_id)
         .or_else(|| value.as_u64().map(|raw| raw.to_string() == player_id))
         .unwrap_or(false)
+}
+
+fn value_matches_any_id(value: &Value, player_ids: &[String]) -> bool {
+    player_ids
+        .iter()
+        .any(|player_id| value_matches_id(value, player_id))
 }
 
 fn value_bool(value: &Value) -> bool {

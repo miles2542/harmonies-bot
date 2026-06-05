@@ -84,6 +84,11 @@
 
 ## Known Gaps
 
+- Fixed in code, pending live QA: invalid card-cube settlement recommendations. Normalizers now require
+  board/done card locations to match the owning player exactly, no longer infer player aliases from card
+  arrays, ignore stale no-cube Spirit offers after the choice window, and card arrows find DOM cards by
+  BGA per-game `cardId` while labels still show persistent `typeArg`. Regression tests and
+  `tools.validate_advisor_plan_legality` cover unavailable/completed/undrafted/over-count settlements.
 - Need broader fixture set listed in [Snapshot QA](./Snapshot%20QA.md) beyond final-score parity.
 - Need more settlement-available active-turn fixtures if BGA exposes edge cases, but match 12 already
   covers early Spirit choice plus late active-turn search smoke.

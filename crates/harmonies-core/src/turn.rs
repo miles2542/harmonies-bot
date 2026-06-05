@@ -325,4 +325,79 @@ mod tests {
                     .any(|step| matches!(step, TurnStep::PlaceToken { .. }))
         }));
     }
+
+    #[test]
+    fn full_hand_cannot_settle_undrafted_river_card() {
+        let mut catalog = CardCatalog::default();
+        catalog.cards.insert(
+            7,
+            CardDefinition {
+                type_arg: 7,
+                point_locations: vec![4],
+                pattern: vec![CardPatternStep {
+                    colors: vec![1],
+                    position: 0,
+                    allow_cube: true,
+                }],
+                is_spirit: false,
+                spirit_scoring_logic: None,
+            },
+        );
+        let player = PlayerState {
+            player_id: "p1".into(),
+            cells: vec![cell(0, 0, vec![Color::Water]), cell(1, 0, Vec::new())],
+            active_cards: vec![
+                ActiveCard {
+                    card_id: 1,
+                    type_arg: 99,
+                    remaining_cubes: 1,
+                    is_spirit: false,
+                },
+                ActiveCard {
+                    card_id: 2,
+                    type_arg: 98,
+                    remaining_cubes: 1,
+                    is_spirit: false,
+                },
+                ActiveCard {
+                    card_id: 3,
+                    type_arg: 97,
+                    remaining_cubes: 1,
+                    is_spirit: false,
+                },
+                ActiveCard {
+                    card_id: 4,
+                    type_arg: 96,
+                    remaining_cubes: 1,
+                    is_spirit: false,
+                },
+            ],
+            spirit_card_choices: Vec::new(),
+            completed_cards: Vec::new(),
+            empty_hexes: 1,
+        };
+        let river = vec![ActiveCard {
+            card_id: 10,
+            type_arg: 7,
+            remaining_cubes: 1,
+            is_spirit: false,
+        }];
+        let turns = generate_current_turn_sequences(
+            &player,
+            &[Color::Field],
+            &river,
+            &catalog,
+            BoardSide::SideA,
+            64,
+        );
+        assert!(turns.iter().all(|turn| {
+            turn.steps.iter().all(|step| {
+                !matches!(
+                    step,
+                    TurnStep::DraftCard { card_id: 10, .. }
+                        | TurnStep::SettleCard { card_id: 10, .. }
+                )
+            })
+        }));
+    }
 }

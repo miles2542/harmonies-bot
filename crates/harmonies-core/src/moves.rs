@@ -353,4 +353,69 @@ mod tests {
         assert!(player.active_cards.is_empty());
         assert_eq!(player.completed_cards.len(), 1);
     }
+
+    #[test]
+    fn settlement_sequences_stop_at_remaining_cube_count() {
+        let mut catalog = CardCatalog::default();
+        catalog.cards.insert(
+            1,
+            CardDefinition {
+                type_arg: 1,
+                point_locations: vec![5, 11],
+                pattern: vec![CardPatternStep {
+                    colors: vec![1],
+                    position: 0,
+                    allow_cube: true,
+                }],
+                is_spirit: false,
+                spirit_scoring_logic: None,
+            },
+        );
+        let mut player = player(vec![
+            cell(0, 0, vec![Color::Water], false),
+            cell(1, 0, vec![Color::Water], false),
+        ]);
+        player.active_cards.push(ActiveCard {
+            card_id: 10,
+            type_arg: 1,
+            remaining_cubes: 1,
+            is_spirit: false,
+        });
+
+        let sequences = generate_settlement_sequences(&player, &catalog);
+        assert!(sequences
+            .iter()
+            .all(|sequence| sequence.settlements.len() <= 1));
+        assert!(sequences
+            .iter()
+            .any(|sequence| sequence.settlements.len() == 1));
+    }
+
+    #[test]
+    fn locked_cube_cells_are_not_settlement_targets() {
+        let mut catalog = CardCatalog::default();
+        catalog.cards.insert(
+            1,
+            CardDefinition {
+                type_arg: 1,
+                point_locations: vec![5],
+                pattern: vec![CardPatternStep {
+                    colors: vec![1],
+                    position: 0,
+                    allow_cube: true,
+                }],
+                is_spirit: false,
+                spirit_scoring_logic: None,
+            },
+        );
+        let mut player = player(vec![cell(0, 0, vec![Color::Water], true)]);
+        player.active_cards.push(ActiveCard {
+            card_id: 10,
+            type_arg: 1,
+            remaining_cubes: 1,
+            is_spirit: false,
+        });
+
+        assert!(legal_settlements(&player, &catalog).is_empty());
+    }
 }

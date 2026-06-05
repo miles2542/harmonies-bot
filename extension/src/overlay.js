@@ -273,17 +273,20 @@
       return;
     }
     addRectOverlay(card, "harmonies-advisor-card-ring");
-    addArrowOverlay(card, cell, String(action.typeArg ?? action.type_arg ?? ""));
+    const typeArg = action.typeArg ?? action.type_arg ?? "";
+    addArrowOverlay(card, cell, String(typeArg));
   }
 
   function findCard(action) {
     const typeArg = action.typeArg ?? action.type_arg;
     const cardId = action.cardId ?? action.card_id;
     const selectors = [
-      typeArg ? `#card_${CSS.escape(String(typeArg))}` : "",
-      typeArg ? `#card-${CSS.escape(String(typeArg))}` : "",
+      cardId ? `#card_${CSS.escape(String(cardId))}` : "",
+      cardId ? `#card-${CSS.escape(String(cardId))}` : "",
       cardId ? `[data-card-id='${CSS.escape(String(cardId))}']` : "",
       cardId ? `[data-cardid='${CSS.escape(String(cardId))}']` : "",
+      typeArg ? `#card_${CSS.escape(String(typeArg))}` : "",
+      typeArg ? `#card-${CSS.escape(String(typeArg))}` : "",
       typeArg ? `[data-type-arg='${CSS.escape(String(typeArg))}']` : "",
     ].filter(Boolean);
     for (const selector of selectors) {

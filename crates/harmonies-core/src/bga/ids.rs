@@ -114,19 +114,13 @@ fn infer_player_ids_from_locations(player: &Value) -> Vec<String> {
     if let Some(tokens) = player.get("tokensOnBoard").and_then(Value::as_object) {
         ids.extend(tokens.keys().filter_map(|key| cell_key_player_id(key)));
     }
-    for field in ["boardAnimalCards", "doneAnimalCards"] {
-        for card in player
-            .get(field)
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-        {
-            if let Some(location) = card.get("location").and_then(Value::as_str) {
-                ids.extend(location.strip_prefix("board").map(str::to_owned));
-                ids.extend(location.strip_prefix("done").map(str::to_owned));
-            }
-        }
-    }
+    let mut cube_locations = HashSet::new();
+    collect_single_player_cube_locations(player, &mut cube_locations);
+    ids.extend(
+        cube_locations
+            .iter()
+            .filter_map(|key| cell_key_player_id(key)),
+    );
     ids.sort();
     ids.dedup();
     ids
