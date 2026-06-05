@@ -122,6 +122,8 @@
 - Offline benchmark tooling now supports fixture corpus runs, `RAYON_NUM_THREADS`, time-budget
   override, wall/engine timing, node counts, depth, and top-group stability:
   `python -m tools.benchmark_cli --threads 12 --time-budget-ms 30000`.
+- Parameter sweep harness added:
+  `python -m tools.sweep_search_params --time-budget-ms 30000 --threads 12`.
 - Native search knobs are now env-configurable for sweeps:
   `HARMONIES_ROOT_BEAM`, `HARMONIES_FUTURE_BEAM`, `HARMONIES_FUTURE_BRANCH`,
   `HARMONIES_FUTURE_DEPTH`, `HARMONIES_REFILL_SAMPLES`, `HARMONIES_CARD_REFILL_SAMPLES`,
@@ -135,6 +137,8 @@
   - 100s budget: ~89.9s engine, 1,071,337 nodes, depth 1 complete, depth 2 partial, future estimate 115.
   - 30s aggressive narrow sweep (`futureBeam=10`, `futureBranch=5`, `refillSamples=2`,
     `cardRefillSamples=1`): ~25.9s, 8,800 nodes, depth 3 complete, future estimate 104.
+- Match 14 near-end aggressive narrow sweep smoke: 15s budget, ~7.5s engine, 4,169 nodes,
+  depth 4 complete.
 
 ## Next Phases
 

@@ -25,6 +25,7 @@ python -m tools.benchmark_cli --threads 12 --time-budget-ms 30000
 python -m tools.benchmark_cli fixtures\advisor_requests\case_request.json --threads 12 `
   --time-budget-ms 30000 --future-beam 10 --future-branch 5 `
   --refill-samples 2 --card-refill-samples 1
+python -m tools.sweep_search_params --time-budget-ms 30000 --threads 12
 ```
 
 Default output is human-readable. `--json` output is intended for fixture logs and `jq`.

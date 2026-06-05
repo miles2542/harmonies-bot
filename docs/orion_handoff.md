@@ -116,6 +116,8 @@ Verified captures:
 - `tools.build_advisor_request_fixture` builds anonymized `AdvisorRequestV1` fixtures from capture JSON or normalized snapshots.
 - `tools.benchmark_cli` now benchmarks one or more advisor request fixtures with optional `--threads`
   and `--time-budget-ms`, reporting wall/engine ms, nodes, completed depth, top group stability.
+- `tools.sweep_search_params` runs named parameter candidates over request fixtures and writes
+  JSON reports under `logs/benchmarks`.
 - Native search knobs are env-configurable and benchmark CLI exposes matching flags:
   `--root-beam`, `--future-beam`, `--future-branch`, `--future-depth`,
   `--refill-samples`, `--card-refill-samples`, `--hard-stop-margin-ms`,
@@ -125,6 +127,7 @@ Verified captures:
   - 100s budget: ~89.9s, 1,071,337 nodes, depth 1 complete, depth 2 partial, future estimate 115.
   - 30s aggressive narrow sweep (`futureBeam=10`, `futureBranch=5`, `refillSamples=2`,
     `cardRefillSamples=1`): ~25.9s, 8,800 nodes, depth 3 complete, future estimate 104.
+- Match 14 near-end aggressive narrow sweep smoke: 15s budget, ~7.5s, 4,169 nodes, depth 4 complete.
 
 Next safe work before tuning:
 
