@@ -87,3 +87,30 @@ At a fixed time cutoff, follow the `Best so far` plan unless deliberately choosi
 ## New Blocking Issue: Player Board DOM Freshness
 
 Live active QA showed turn 2 plan placing Field/Foliage at cells already containing Field tokens from turn 1. Conclusion: player board state from gamedatas can be stale just like central groups. Next work must make extension read current visible board DOM for analyzed player and override normalized player.cells before advisor request. Do not tune until this is fixed and verified.
+
+## New Blocking Issue: Card Source Freshness / Ownership
+
+Live spectate QA on snapshot temp\\snapshots\\harmonies-gamedatas-1780652789428.json showed advisor settling cards that are visually in opponent hand, and another case considering river card while active hand has 4 full slots and no plan-created room. Need audit card source path. Hypothesis: gamedatas boardAnimalCards/river/done can be stale or location/id mapping still wrong; extension currently overrides central groups and board cells from DOM, but not active/river/completed cards from DOM. Before tuning: define Draft precisely, verify plan legality from snapshot+DOM, likely add DOM card override and plan validator using captured DOM cards. User wants semi-automated ground-truth validation loop from richer snapshots instead of manual extension-only QA.
+
+## Latest DOM-First Fixes
+
+- Extension now reads `VisibleStateV1` at Analyze click and freezes that state for the advisor run.
+- `VisibleStateV1` uses visible DOM for central groups, player boards, active hand cards, completed cards, river cards, Spirit choices, and cube counts when reliable.
+- `gamedatas` remains fallback only; normalizer does not let `domBoards=true/domCards=false` empty card arrays override card state.
+- Capture userscript version `0.3.2` fixes a regression where BGA `.harmonies-card` elements were filtered out as capture UI.
+- Capture converter uses `visibleStateV1` when reliable and falls back to raw `domSnapshot` card extraction if `visibleStateV1.reliability.domCards=false`.
+- Validator now replays group selection, token placement, draft, settlement source, remaining cubes, locked cells, and catalog pattern validity.
+
+Verified captures:
+
+- `temp/snapshots/harmonies-gamedatas-1780652789428.json` passes legality replay.
+- Match 14 captures `1780660938281`, `1780661142713`, `1780661303535` pass legality replay after raw DOM card fallback.
+- `1780660938281` confirms full 4-card hand case; active cards from visible DOM are `1/type17`, `3/type30`, `24/type3`, `32/type24`, completed Spirit `21/type39`.
+- `1780661142713` confirms freed-slot/near-end case; active player `97974965`, active cards `4/type26`, `29/type19`, `30/type7`, completed `13/type31`, `16/type8`, `27/type36`.
+
+Next safe work before tuning:
+
+- Reload extension and ScriptCat with latest files when user returns; new capture version should report `domCards=true`.
+- Split oversized `tools/bga_harmonies_capture.user.js` and `tools/dom_capture_to_snapshot.py` when practical; both exceed preferred 300-400 lines.
+- Add a JS fixture/unit test for normalizer card fallback guard if local test harness exists or can be small.
+- Do not start weight tuning until one live/spectate UI test confirms arrows and panel cards match visible active hand with capture `0.3.2`.

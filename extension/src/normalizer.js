@@ -32,11 +32,12 @@
     const activePlayerId = normalizePlayerId(readActivePlayerId(gamedatas), playerIds);
     const allCubeLocations = collectAllCubeLocations(gamedatas, playersById);
     const cardCubeCounts = countCardCubes(gamedatas.cubesOnAnimalCards);
-    const centralTokenGroups =
-      Array.isArray(options.centralTokenGroups) && options.centralTokenGroups.length
+    const visibleState = objectValue(options.visibleStateV1);
+    const centralTokenGroups = visibleCentralGroups(visibleState)
+      || (Array.isArray(options.centralTokenGroups) && options.centralTokenGroups.length
         ? options.centralTokenGroups
-        : parseCentralGroups(gamedatas.tokensOnCentralBoard);
-    const boardCellsByPlayerId = objectValue(options.boardCellsByPlayerId) || {};
+        : parseCentralGroups(gamedatas.tokensOnCentralBoard));
+    const boardCellsByPlayerId = visibleBoardCellsByPlayerId(visibleState, options.boardCellsByPlayerId);
     const players = Object.entries(playersById).map(([playerId, player]) =>
       normalizePlayer(
         playerId,
@@ -47,6 +48,7 @@
         cardCubeCounts,
         playerIds,
         boardCellsByPlayerId,
+        visibleState,
       ),
     );
 
@@ -57,7 +59,7 @@
       boardSide: parseBoardSide(gamedatas.boardSide),
       players,
       centralTokenGroups,
-      riverCards: parseCards(gamedatas.river, new Map(), false, { locations: ["river"] }),
+      riverCards: visibleRiverCards(visibleState) || parseCards(gamedatas.river, new Map(), false, { locations: ["river"] }),
       bagCounts: inferBagCounts(players, centralTokenGroups, gamedatas.remainingTokens),
       cardsCatalogVersion: stringValue(gamedatas.version) || "bga",
     };
@@ -72,6 +74,7 @@
     cardCubeCounts,
     playerIds,
     boardCellsByPlayerId,
+    visibleState,
   ) {
     const bgaIds = bgaIdsForPlayer(playerId, player, gamedatas, playerIds);
     const tokenStacks = parseTokensOnBoard(player.tokensOnBoard);
@@ -92,28 +95,34 @@
         lockedByCube: lockedByCube || Boolean(domCell?.lockedByCube),
       };
     });
-    const activeCards = parseCards(player.boardAnimalCards, cardCubeCounts, false, {
+    const visiblePlayer = visibleReliable(visibleState, "domCards")
+      ? visiblePlayerFor(visibleState, playerId, bgaIds)
+      : null;
+    const activeCards = visibleActiveCards(visiblePlayer) || parseCards(player.boardAnimalCards, cardCubeCounts, false, {
       locations: bgaIds.map((id) => `board${id}`),
     });
-    const playerSpirits = parsePlayerSpirits(
-      gamedatas.spiritsCards,
-      playerId,
-      bgaIds,
-      cardCubeCounts,
-      gamedatas,
-      playerIds,
-    );
-    activeCards.push(...playerSpirits);
-    const spiritCardChoices = playerSpirits.length
+    if (!visiblePlayer) {
+      const playerSpirits = parsePlayerSpirits(
+        gamedatas.spiritsCards,
+        playerId,
+        bgaIds,
+        cardCubeCounts,
+        gamedatas,
+        playerIds,
+      );
+      activeCards.push(...playerSpirits);
+    }
+    const visibleChoices = visibleSpiritChoices(visibleState, playerId, bgaIds);
+    const spiritCardChoices = visibleChoices || (activeCards.some((card) => card.isSpirit)
       ? []
-      : parsePlayerSpiritChoices(gamedatas.spiritsCards, playerId, bgaIds, cardCubeCounts, gamedatas, playerIds);
+      : parsePlayerSpiritChoices(gamedatas.spiritsCards, playerId, bgaIds, cardCubeCounts, gamedatas, playerIds));
 
     return {
       playerId,
       cells,
       activeCards,
       spiritCardChoices,
-      completedCards: parseCards(player.doneAnimalCards, cardCubeCounts, true, {
+      completedCards: visibleCompletedCards(visiblePlayer) || parseCards(player.doneAnimalCards, cardCubeCounts, true, {
         locations: bgaIds.map((id) => `done${id}`),
       }),
       emptyHexes: domCells.size
@@ -264,6 +273,100 @@
       }
     });
     return cells;
+  }
+
+  function visibleCentralGroups(visibleState) {
+    if (!visibleReliable(visibleState, "domCentral")) {
+      return null;
+    }
+    const groups = arrayValue(visibleState.centralTokenGroups)
+      .map((group) => arrayValue(group).filter(isKnownColor));
+    return groups.length ? groups : null;
+  }
+
+  function visibleBoardCellsByPlayerId(visibleState, fallback) {
+    const fromFallback = objectValue(fallback) || {};
+    if (!visibleReliable(visibleState, "domBoards")) {
+      return fromFallback;
+    }
+    const byPlayer = { ...fromFallback };
+    arrayValue(visibleState.players).forEach((player) => {
+      const playerId = stringValue(player?.playerId);
+      const cells = arrayValue(player?.cells);
+      if (playerId && cells.length) {
+        byPlayer[playerId] = cells;
+      }
+    });
+    return byPlayer;
+  }
+
+  function visiblePlayerFor(visibleState, playerId, bgaIds) {
+    if (!visibleReliable(visibleState, "domCards") && !visibleReliable(visibleState, "domBoards")) {
+      return null;
+    }
+    return (
+      arrayValue(visibleState.players).find((player) =>
+        [playerId, ...bgaIds].includes(stringValue(player?.playerId)),
+      ) || null
+    );
+  }
+
+  function visibleActiveCards(visiblePlayer) {
+    return visiblePlayer ? visibleCards(arrayValue(visiblePlayer.activeCards), false) : null;
+  }
+
+  function visibleCompletedCards(visiblePlayer) {
+    if (!visiblePlayer) {
+      return null;
+    }
+    return visibleCards(arrayValue(visiblePlayer.completedCards), true);
+  }
+
+  function visibleRiverCards(visibleState) {
+    if (!visibleReliable(visibleState, "domCards")) {
+      return null;
+    }
+    return visibleCards(arrayValue(visibleState.riverCards), false);
+  }
+
+  function visibleSpiritChoices(visibleState, playerId, bgaIds) {
+    if (!visibleReliable(visibleState, "domCards")) {
+      return null;
+    }
+    const choicesByPlayer = objectValue(visibleState.spiritChoicesByPlayerId) || {};
+    const cards = [playerId, ...bgaIds]
+      .map((id) => choicesByPlayer[id])
+      .find(Array.isArray);
+    if (!cards) {
+      return null;
+    }
+    return visibleCards(cards, false).map((card) => ({ ...card, remainingCubes: Math.max(1, card.remainingCubes) }));
+  }
+
+  function visibleCards(cards, completed) {
+    return cards
+      .map((card) => {
+        const cardId = numberValue(card?.cardInstanceId ?? card?.cardId);
+        const typeArg = numberValue(card?.typeArg);
+        if (!Number.isFinite(cardId) || !Number.isFinite(typeArg)) {
+          return null;
+        }
+        return {
+          cardId,
+          typeArg,
+          remainingCubes: completed ? 0 : Math.max(0, Math.trunc(numberValue(card.remainingCubes) || 0)),
+          isSpirit: Boolean(card.isSpirit),
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function visibleReliable(visibleState, key) {
+    return Boolean(objectValue(visibleState)?.reliability?.[key]);
+  }
+
+  function isKnownColor(color) {
+    return Object.values(COLOR_BY_TYPE_ARG).includes(color);
   }
 
   function parseCards(value, cubeCounts, completed, options = {}) {

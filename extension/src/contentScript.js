@@ -93,9 +93,8 @@
       return;
     }
     const playerId = perspective.playerId;
-    const centralTokenGroups = readDomCentralTokenGroups();
-    const boardCellsByPlayerId = readDomBoardCellsByPlayerId(playerId, gamedatas);
-    const stateKey = buildStateKey(gamedatas, playerId, centralTokenGroups, boardCellsByPlayerId);
+    const visibleStateV1 = window.HarmoniesVisibleStateReader.readVisibleState(gamedatas, playerId);
+    const stateKey = buildStateKey(gamedatas, playerId, visibleStateV1);
     if (!stateKey) {
       overlay.setStatus("Waiting for complete table state");
       return;
@@ -116,7 +115,7 @@
         if (activeRunId === runId && activeStateKey === stateKey) {
           overlay.renderRecommendationTier(partialResponse);
         }
-      }, playerId, { centralTokenGroups, boardCellsByPlayerId });
+      }, playerId, { visibleStateV1 });
       if (activeRunId === runId && activeStateKey === stateKey) {
         overlay.renderRecommendationTier(response);
       }
@@ -177,12 +176,7 @@
     return name ? `${name} (${playerId})` : String(playerId || "unknown");
   }
 
-  function buildStateKey(
-    gamedatas,
-    playerId,
-    centralTokenGroups = readDomCentralTokenGroups(),
-    boardCellsByPlayerId = readDomBoardCellsByPlayerId(playerId, gamedatas),
-  ) {
+  function buildStateKey(gamedatas, playerId, visibleStateV1) {
     const player = gamedatas?.players?.[playerId];
     if (!player) {
       return "";
@@ -192,28 +186,15 @@
       activePlayer: gamedatas?.gamestate?.active_player || "",
       stateName: gamedatas?.gamestate?.name || "",
       remainingTokens: gamedatas?.remainingTokens ?? null,
-      central: centralTokenGroups,
+      visibleStateV1,
       river: compactCards(gamedatas?.river),
       spirits: compactCards(gamedatas?.spiritsCards),
       boardCards: compactCards(player.boardAnimalCards),
       doneCards: compactCards(player.doneAnimalCards),
-      boardCells: boardCellsByPlayerId[playerId] || [],
       animalCubesOnBoard: player.animalCubesOnBoard || {},
       cubesOnAnimalCards: gamedatas?.cubesOnAnimalCards || {},
       emptyHexes: player.emptyHexes ?? null,
     });
-  }
-
-  function compactCentralGroups(groups) {
-    return Object.entries(groups || {})
-      .sort(([left], [right]) => Number.parseInt(left, 10) - Number.parseInt(right, 10))
-      .map(([key, tokens]) => [key, compactCentralTokens(tokens)]);
-  }
-
-  function compactCentralTokens(tokens) {
-    return (Array.isArray(tokens) ? tokens : [])
-      .map((token) => colorByTypeArg(token?.type_arg))
-      .filter(Boolean);
   }
 
   function compactCards(cards) {
@@ -226,134 +207,6 @@
     ]);
   }
 
-  function readDomBoardCellsByPlayerId(playerId, gamedatas) {
-    const cells = readDomPlayerCells(playerId, gamedatas?.hexes || []);
-    return cells.length ? { [playerId]: cells } : {};
-  }
-
-  function readDomPlayerCells(playerId, hexes) {
-    if (!playerId || !Array.isArray(hexes)) {
-      return [];
-    }
-    const cells = [];
-    for (const hex of hexes) {
-      const col = Number(hex?.col);
-      const row = Number(hex?.row);
-      if (!Number.isFinite(col) || !Number.isFinite(row)) {
-        continue;
-      }
-      const cell = document.getElementById(`cell_${playerId}_${col}_${row}`);
-      if (!cell || !isVisibleElement(cell)) {
-        continue;
-      }
-      cells.push({
-        coord: { col, row },
-        stack: { tokens: domTokensInCell(cell) },
-        lockedByCube: domCubeInCell(cell),
-      });
-    }
-    return cells;
-  }
-
-  function domTokensInCell(cell) {
-    const rect = cell.getBoundingClientRect();
-    return Array.from(document.querySelectorAll(".colored-token, [class*='colored-token']"))
-      .filter((node) => isVisibleElement(node) && rectContainsCenter(rect, node.getBoundingClientRect()))
-      .map((node) => ({ color: domTokenColor(node), level: domTokenLevel(node) }))
-      .filter((token) => token.color)
-      .sort((left, right) => left.level - right.level)
-      .map((token) => token.color);
-  }
-
-  function domCubeInCell(cell) {
-    const rect = cell.getBoundingClientRect();
-    return Array.from(document.querySelectorAll(".animal-cube, [class*='animal-cube']")).some(
-      (node) => isVisibleElement(node) && rectContainsCenter(rect, node.getBoundingClientRect()),
-    );
-  }
-
-  function readDomCentralTokenGroups() {
-    const groups = [];
-    for (let groupId = 1; groupId <= 5; groupId += 1) {
-      const hole = document.getElementById(`hole-${groupId}`);
-      if (!hole) {
-        continue;
-      }
-      const tokenNodes = centralTokenNodes(hole, groupId);
-      const tokens = tokenNodes
-        .map(domTokenColor)
-        .filter(Boolean);
-      groups.push(tokens);
-    }
-    if (groups.length === 5 && groups.every((tokens) => tokens.length === 3)) {
-      return groups;
-    }
-    return compactCentralGroups(latestPayload?.gamedatas?.tokensOnCentralBoard).map(
-      ([, tokens]) => tokens,
-    );
-  }
-
-  function centralTokenNodes(hole, groupId) {
-    const orderedIds = [1, 2, 3]
-      .map((tokenIndex) => document.getElementById(`hole-${groupId}-token-${tokenIndex}`))
-      .filter((node) => node && hole.contains(node) && isVisibleElement(node));
-    const candidates = orderedIds.length
-      ? orderedIds
-      : Array.from(
-          hole.querySelectorAll(
-            ".hole-token, .colored-token, [class*='color-'], [id^='hole-'][id*='-token-']",
-          ),
-        ).filter(isVisibleElement);
-    const unique = [];
-    const seen = new Set();
-    candidates.forEach((node) => {
-      if (!seen.has(node)) {
-        seen.add(node);
-        unique.push(node);
-      }
-    });
-    unique.sort((left, right) => tokenNodeSortKey(left) - tokenNodeSortKey(right));
-    return unique.filter((node) => domTokenColor(node)).slice(0, 3);
-  }
-
-  function tokenNodeSortKey(node) {
-    const match = /-token-(\d+)/.exec(String(node.id || ""));
-    return match ? Number.parseInt(match[1], 10) : 99;
-  }
-
-  function isVisibleElement(node) {
-    const style = window.getComputedStyle(node);
-    const rect = node.getBoundingClientRect();
-    return (
-      style.display !== "none" &&
-      style.visibility !== "hidden" &&
-      Number(style.opacity || 1) > 0.01 &&
-      rect.width > 2 &&
-      rect.height > 2
-    );
-  }
-
-  function domTokenColor(node) {
-    const className = [node, ...node.querySelectorAll("*")]
-      .map((item) => String(item.className || ""))
-      .join(" ");
-    const match = /(?:^|\s)color-(\d)(?:\s|$)/.exec(className);
-    return colorByTypeArg(match?.[1]);
-  }
-
-  function domTokenLevel(node) {
-    const className = String(node.className || "");
-    const matches = Array.from(className.matchAll(/(?:^|\s)level-(\d+)(?:\s|$)/g));
-    const last = matches.at(-1);
-    return last ? Number.parseInt(last[1], 10) : 1;
-  }
-
-  function rectContainsCenter(container, child) {
-    const x = child.left + child.width / 2;
-    const y = child.top + child.height / 2;
-    return x >= container.left && x <= container.right && y >= container.top && y <= container.bottom;
-  }
-
   function clonePlainObject(value) {
     if (!value) {
       return value;
@@ -363,18 +216,6 @@
     } catch (_error) {
       return JSON.parse(JSON.stringify(value));
     }
-  }
-
-  function colorByTypeArg(typeArg) {
-    return {
-      1: "water",
-      2: "mountain",
-      3: "trunk",
-      4: "foliage",
-      5: "field",
-      6: "building",
-      7: "building",
-    }[Number(typeArg)];
   }
 
   window.addEventListener("message", (event) => {

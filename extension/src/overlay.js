@@ -278,16 +278,12 @@
   }
 
   function findCard(action) {
-    const typeArg = action.typeArg ?? action.type_arg;
     const cardId = action.cardId ?? action.card_id;
     const selectors = [
       cardId ? `#card_${CSS.escape(String(cardId))}` : "",
       cardId ? `#card-${CSS.escape(String(cardId))}` : "",
       cardId ? `[data-card-id='${CSS.escape(String(cardId))}']` : "",
       cardId ? `[data-cardid='${CSS.escape(String(cardId))}']` : "",
-      typeArg ? `#card_${CSS.escape(String(typeArg))}` : "",
-      typeArg ? `#card-${CSS.escape(String(typeArg))}` : "",
-      typeArg ? `[data-type-arg='${CSS.escape(String(typeArg))}']` : "",
     ].filter(Boolean);
     for (const selector of selectors) {
       const target = document.querySelector(selector);
@@ -372,7 +368,7 @@
       text.classList.add("harmonies-advisor-arrow-label");
       text.setAttribute("x", String(cx));
       text.setAttribute("y", String(cy - 4));
-      text.textContent = `card ${label} cube`;
+      text.textContent = `type ${label} cube`;
       svg.appendChild(text);
     }
     visualLayer().appendChild(svg);

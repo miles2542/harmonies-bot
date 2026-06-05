@@ -19,6 +19,7 @@
           gamedatas,
           perspectivePlayerId,
           {
+            visibleStateV1: options.visibleStateV1,
             centralTokenGroups: options.centralTokenGroups,
             boardCellsByPlayerId: options.boardCellsByPlayerId,
           },
@@ -195,13 +196,13 @@
         return `${prefix} Place ${labelColor(action.token)} at (${action.col}, ${action.row})`;
       }
       if (action.kind === "draftCard") {
-        return `${prefix} Draft card ${cardTypeArg(action)} (id ${cardId(action)})`;
+        return `${prefix} Draft type ${cardTypeArg(action)} card (instance ${cardId(action)})`;
       }
       if (action.kind === "chooseSpirit") {
-        return `${prefix} Choose Spirit card ${cardTypeArg(action)} (id ${cardId(action)})`;
+        return `${prefix} Choose Spirit type ${cardTypeArg(action)} card (instance ${cardId(action)})`;
       }
       if (action.kind === "settleCard") {
-        return `${prefix} Settle card ${cardTypeArg(action)} cube at (${action.col}, ${action.row})`;
+        return `${prefix} Settle type ${cardTypeArg(action)} card cube at (${action.col}, ${action.row})`;
       }
       return `${prefix} ${action.kind}`;
     });
