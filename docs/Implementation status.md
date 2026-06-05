@@ -129,7 +129,8 @@
   pruning. Next work should benchmark node counts/frontier sizes and tune branch/refill/depth knobs
   before assuming a threading bug.
 - Offline benchmark tooling now supports fixture corpus runs, `RAYON_NUM_THREADS`, time-budget
-  override, wall/engine timing, node counts, depth, and top-group stability:
+  override, wall/engine timing, root-generation timing, root sequence count, node counts, depth,
+  and top-group stability:
   `python -m tools.benchmark_cli --threads 12 --time-budget-ms 30000`.
 - Parameter sweep harness added:
   `python -m tools.sweep_search_params --time-budget-ms 30000 --threads 12`.
@@ -142,12 +143,17 @@
 - DOM/capture conversion now infers `bagCounts` from visible board/central tokens plus BGA
   `remainingTokens`; old DOM fixtures had zero bag counts, making future refill expansion impossible.
 - Match 14 full-hand benchmark after bag-count/depth fixes:
-  - 30s budget: ~17.7s engine, 48,120 nodes, depth 1 complete, future estimate 104.
+  - Cached frontier scoring cut 10s full-hand root generation from ~7.1s to ~2.9s, and total
+    first-answer time from ~9.2s to ~3.7s on the measured fixture.
+  - 30s budget with balanced-narrow knobs: ~17.1s engine, 36,652 nodes, depth 3 complete,
+    future estimate 118.
   - 100s budget: ~89.9s engine, 1,071,337 nodes, depth 1 complete, depth 2 partial, future estimate 115.
   - 30s aggressive narrow sweep (`futureBeam=10`, `futureBranch=5`, `refillSamples=2`,
     `cardRefillSamples=1`): ~25.9s, 8,800 nodes, depth 3 complete, future estimate 104.
 - Match 14 near-end aggressive narrow sweep smoke: 15s budget, ~7.5s engine, 4,169 nodes,
   depth 4 complete.
+- Match 14 near-end balanced-narrow 30s smoke after cached scoring: ~5.0s engine, 10,877 nodes,
+  depth 4 complete, future estimate 129.
 - 30s two-fixture sweep report: `logs/benchmarks/search-param-sweep-match14-30s.json`.
   `balanced_narrow` currently best small-sweep candidate: full-hand future 115 at depth 2 partial,
   near-end future 129 with depth 4 complete.

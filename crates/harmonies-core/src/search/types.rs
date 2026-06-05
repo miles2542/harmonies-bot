@@ -12,6 +12,8 @@ use crate::{
 pub struct SearchProgress {
     pub depth_completed: usize,
     pub nodes_evaluated: usize,
+    pub root_generation_ms: u64,
+    pub root_sequences_generated: usize,
     pub stopped_early: bool,
 }
 

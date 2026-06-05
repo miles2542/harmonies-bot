@@ -180,9 +180,12 @@
 
   function statusText(response, progress) {
     const warnings = response.warnings?.length ? `; ${response.warnings.join("; ")}` : "";
+    const rootInfo = progress.rootGenerationMs
+      ? `; root ${progress.rootGenerationMs}ms/${progress.rootSequencesGenerated || 0} seq`
+      : "";
     return `${response.status}; ${response.elapsedMs}ms; depth ${progress.depthCompleted || 0}; nodes ${
       progress.nodesEvaluated || 0
-    }${warnings}`;
+    }${rootInfo}${warnings}`;
   }
 
   function actionSteps(move) {

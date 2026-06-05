@@ -141,7 +141,8 @@ fn root_candidates(
     settings: &SearchSettings,
     progress: &mut SearchProgress,
 ) -> Vec<RootCandidate> {
-    let mut roots: Vec<_> = snapshot
+    let started = Instant::now();
+    let group_results: Vec<_> = snapshot
         .central_token_groups
         .par_iter()
         .enumerate()
@@ -156,12 +157,20 @@ fn root_candidates(
                 catalog,
                 snapshot.board_side,
                 settings.root_turn_beam_width,
-            )
-            .into_iter()
-            .fold(Vec::<TurnSequence>::new(), |mut best_by_choice, turn| {
-                upsert_best_turn_by_spirit_choice(&mut best_by_choice, turn, snapshot, catalog);
-                best_by_choice
-            });
+            );
+            let sequences_generated = turns.len();
+            let turns =
+                turns
+                    .into_iter()
+                    .fold(Vec::<TurnSequence>::new(), |mut best_by_choice, turn| {
+                        upsert_best_turn_by_spirit_choice(
+                            &mut best_by_choice,
+                            turn,
+                            snapshot,
+                            catalog,
+                        );
+                        best_by_choice
+                    });
             turns
                 .into_iter()
                 .map(|turn| {
@@ -177,14 +186,22 @@ fn root_candidates(
                         opponent_denial_estimate: 0,
                     }
                 })
+                .map(move |root| (root, sequences_generated))
                 .collect::<Vec<_>>()
         })
         .collect();
+    let sequences_generated = group_results
+        .iter()
+        .map(|(_, sequences)| *sequences)
+        .sum::<usize>();
+    let mut roots: Vec<_> = group_results.into_iter().map(|(root, _)| root).collect();
     roots.sort_by(|left, right| {
         left.group_index
             .cmp(&right.group_index)
             .then_with(|| left.utility_estimate.cmp(&right.utility_estimate))
     });
+    progress.root_generation_ms = started.elapsed().as_millis().try_into().unwrap_or(u64::MAX);
+    progress.root_sequences_generated = sequences_generated;
     progress.nodes_evaluated += roots.len();
     roots
 }

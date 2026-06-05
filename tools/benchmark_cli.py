@@ -101,6 +101,8 @@ def summarize_request(request_path: Path, runs: list[RunResult]) -> dict[str, An
     top_groups = [plan["group"] for plan in first_plans]
     engine_elapsed = [float(response.get("elapsedMs", 0)) for response in responses]
     nodes = [float(item.get("nodesEvaluated", 0)) for item in progress]
+    root_ms = [float(item.get("rootGenerationMs", 0)) for item in progress]
+    root_sequences = [float(item.get("rootSequencesGenerated", 0)) for item in progress]
     depths = [int(item.get("depthCompleted", 0)) for item in progress]
     return {
         "request": str(request_path),
@@ -108,6 +110,8 @@ def summarize_request(request_path: Path, runs: list[RunResult]) -> dict[str, An
         "wallMs": stats([run.wall_ms for run in runs]),
         "engineElapsedMs": stats(engine_elapsed),
         "nodesEvaluated": stats(nodes),
+        "rootGenerationMs": stats(root_ms),
+        "rootSequencesGenerated": stats(root_sequences),
         "depthCompleted": {"min": min(depths), "max": max(depths), "values": depths},
         "topGroups": top_groups,
         "uniqueTopGroups": sorted({group for group in top_groups if group is not None}),

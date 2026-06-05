@@ -128,6 +128,8 @@ async fn stream_advice(
                     "progress": {
                         "depthCompleted": 0,
                         "nodesEvaluated": 0,
+                        "rootGenerationMs": 0,
+                        "rootSequencesGenerated": 0,
                         "stoppedEarly": false
                     },
                     "warnings": ["request parse error"]

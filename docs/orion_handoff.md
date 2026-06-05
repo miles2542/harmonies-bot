@@ -124,6 +124,13 @@ Verified captures:
   `--root-beam`, `--future-beam`, `--future-branch`, `--future-depth`,
   `--refill-samples`, `--card-refill-samples`, `--hard-stop-margin-ms`,
   `--min-future-expand-ms`.
+- Search progress now reports `rootGenerationMs` and `rootSequencesGenerated`; extension status text
+  shows this as `root <ms>/<seq> seq`.
+- Current-turn frontier sort now caches score keys. On Match 14 full-hand, 10s balanced-narrow smoke
+  dropped root generation from ~7.1s to ~2.9s and total engine time from ~9.2s to ~3.7s.
+- Match 14 balanced-narrow 30s smoke after cached scoring:
+  full-hand ~17.1s, 36,652 nodes, depth 3 complete, future 118; near-end ~5.0s,
+  10,877 nodes, depth 4 complete, future 129.
 - Match 14 full-hand benchmark with 12 Rayon threads:
   - 30s budget: ~17.7s, 48,120 nodes, depth 1 complete, future estimate 104.
   - 100s budget: ~89.9s, 1,071,337 nodes, depth 1 complete, depth 2 partial, future estimate 115.

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{cmp::Reverse, collections::HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -88,10 +88,8 @@ pub fn generate_current_turn_sequences(
             break;
         }
         next_frontier.retain(|state| seen.insert(state_key(state)));
-        next_frontier.sort_by(|left, right| {
-            let left_score = score_player(&left.player, board_side, catalog).total();
-            let right_score = score_player(&right.player, board_side, catalog).total();
-            right_score.cmp(&left_score)
+        next_frontier.sort_by_cached_key(|state| {
+            Reverse(score_player(&state.player, board_side, catalog).total())
         });
         next_frontier.truncate(beam_width);
         frontier = next_frontier;
