@@ -1,7 +1,7 @@
 (function harmoniesAdvisorClientModule() {
   const SERVICE_URL = "http://127.0.0.1:17848/advise";
   const SERVICE_WS_URL = "ws://127.0.0.1:17848/ws";
-  const SERVICE_TIMEOUT_MS = 65000;
+  const SERVICE_TIMEOUT_MS = 115000;
   const COLOR_LABELS = {
     water: "Water",
     mountain: "Mountain",
@@ -23,13 +23,14 @@
         try {
           const response = await requestNativeAdvisor(snapshot, (partialResponse) => {
             if (onUpdate) {
-              onUpdate(adaptAdvisorResponse(partialResponse, snapshot));
+              onUpdate(adaptAdvisorResponse(partialResponse, snapshot, false));
             }
           });
-          return adaptAdvisorResponse(response, snapshot);
+          return adaptAdvisorResponse(response, snapshot, true);
         } catch (error) {
           const mock = window.HarmoniesMockAdvisor.recommend(snapshot);
           mock.status = `Mock advisor active; native service unavailable: ${error.message}`;
+          mock.isFinal = true;
           return mock;
         }
       },
@@ -53,7 +54,7 @@
   function buildAdvisorRequest(snapshot) {
     return {
       snapshot,
-      timeBudgetMs: 56000,
+      timeBudgetMs: 106000,
       maxResults: 3,
       seed: optionsSeed(snapshot),
       runtimeMode: "native-service",
@@ -146,13 +147,14 @@
     });
   }
 
-  function adaptAdvisorResponse(response, snapshot) {
+  function adaptAdvisorResponse(response, snapshot, isFinal = false) {
     const best = response.bestMoves?.[0] || null;
     const progress = response.progress || {};
     return {
       status: statusText(response, progress),
       elapsedMs: response.elapsedMs || 0,
       progress,
+      isFinal,
       bestMove: best
         ? {
             playerId: snapshot?.perspectivePlayerId || "",

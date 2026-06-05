@@ -16,6 +16,12 @@ Run local advisor service before loading/using the extension:
 cargo run -p harmonies-service
 ```
 
+For live testing, prefer the release build; debug builds can be much slower:
+
+```powershell
+cargo run --release -p harmonies-service
+```
+
 Default endpoint: `http://127.0.0.1:17848/advise`.
 
 Optional tuned weights:
@@ -29,7 +35,7 @@ Optional CPU thread cap. By default the native search uses available logical CPU
 
 ```powershell
 $env:HARMONIES_SEARCH_THREADS='15'
-cargo run -p harmonies-service
+cargo run --release -p harmonies-service
 ```
 
 Service smoke:
@@ -48,7 +54,8 @@ This starts a temporary local service, checks `/health`, `/advise`, and `/ws`, t
 - Caches latest visible table state.
 - Sends a frozen normalized snapshot to local Rust service only when `Analyze` is pressed.
 - In spectator mode, analyzes from the current active player's perspective.
-- Keeps the first usable plan fixed and appends later streamed depth results as collapsible tiers.
+- Searches for up to about 100 seconds and appends streamed plans as collapsible selectable sections.
+- The selected plan controls the visual indicators.
 - Falls back to mock recommendation when local service is unavailable.
 - Never clicks, never calls `ajaxcall`, never sends BGA action requests.
 

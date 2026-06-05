@@ -101,7 +101,7 @@ pub fn advise_with_progress(
 pub fn advise_with_progress_and_cancel(
     request: AdvisorRequestV1,
     mut on_progress: impl FnMut(AdvisorResponseV1),
-    should_cancel: impl Fn() -> bool,
+    should_cancel: impl Fn() -> bool + Sync,
 ) -> AdvisorResponseV1 {
     let started = Instant::now();
     let mut warnings = Vec::new();

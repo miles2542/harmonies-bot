@@ -25,7 +25,7 @@ pub use types::{SearchOutcome, SearchProgress};
 const ROOT_TURN_BEAM_WIDTH: usize = 512;
 const FUTURE_TURN_BEAM_WIDTH: usize = 50;
 const FUTURE_BRANCH_WIDTH: usize = 50;
-const FUTURE_DEPTH: usize = 3;
+const FUTURE_DEPTH: usize = 4;
 const REFILL_SAMPLES: usize = 10;
 const CARD_REFILL_SAMPLES: usize = 4;
 const HARD_STOP_MARGIN_MS: u64 = 6_000;
@@ -40,7 +40,7 @@ pub fn search_current_player_turn_with_progress(
     seed: u64,
     time_budget_ms: u64,
     started: Instant,
-    should_cancel: impl Fn() -> bool,
+    should_cancel: impl Fn() -> bool + Sync,
     mut on_progress: impl FnMut(SearchOutcome),
 ) -> SearchOutcome {
     let deadline =
@@ -229,28 +229,39 @@ fn estimate_depth(
     seed: u64,
     depth: usize,
     deadline: Instant,
-    should_cancel: &impl Fn() -> bool,
+    should_cancel: &(impl Fn() -> bool + Sync),
     progress: &mut SearchProgress,
 ) {
-    for (index, root) in roots.iter_mut().enumerate() {
-        if should_cancel() || Instant::now() >= deadline {
-            progress.stopped_early = true;
-            return;
-        }
-        let state = state_after_root(root, snapshot, catalog, seed.wrapping_add(index as u64));
-        let future = future_value(
-            state,
-            snapshot.board_side,
-            catalog,
-            seed.wrapping_add(index as u64),
-            depth.saturating_sub(1),
-            deadline,
-            should_cancel,
-            progress,
-        );
-        root.future_estimate = future.max(root.immediate.total());
-        root.utility_estimate =
-            weights.utility(root.future_estimate, root.opponent_denial_estimate);
+    let outcomes: Vec<SearchProgress> = roots
+        .par_iter_mut()
+        .enumerate()
+        .map(|(index, root)| {
+            let mut local_progress = SearchProgress::default();
+            if should_cancel() || Instant::now() >= deadline {
+                local_progress.stopped_early = true;
+                return local_progress;
+            }
+            let state = state_after_root(root, snapshot, catalog, seed.wrapping_add(index as u64));
+            let future = future_value(
+                state,
+                snapshot.board_side,
+                catalog,
+                seed.wrapping_add(index as u64),
+                depth.saturating_sub(1),
+                deadline,
+                should_cancel,
+                &mut local_progress,
+            );
+            root.future_estimate = future.max(root.immediate.total());
+            root.utility_estimate =
+                weights.utility(root.future_estimate, root.opponent_denial_estimate);
+            local_progress
+        })
+        .collect();
+
+    for outcome in outcomes {
+        progress.nodes_evaluated += outcome.nodes_evaluated;
+        progress.stopped_early |= outcome.stopped_early;
     }
 }
 
@@ -261,28 +272,51 @@ fn future_value(
     seed: u64,
     depth_remaining: usize,
     deadline: Instant,
-    should_cancel: &impl Fn() -> bool,
+    should_cancel: &(impl Fn() -> bool + Sync),
     progress: &mut SearchProgress,
 ) -> i32 {
     let mut frontier = vec![initial];
     let mut best = frontier[0].score;
     for depth in 0..depth_remaining {
+        if should_stop(deadline, should_cancel) {
+            progress.stopped_early = true;
+            return best;
+        }
+        let expanded: Vec<(Vec<FutureState>, SearchProgress)> = frontier
+            .into_par_iter()
+            .enumerate()
+            .map(|(state_index, state)| {
+                let mut output = Vec::new();
+                let mut local_progress = SearchProgress::default();
+                if should_stop(deadline, should_cancel) {
+                    local_progress.stopped_early = true;
+                    return (output, local_progress);
+                }
+                let state_seed = seed
+                    .wrapping_add(depth as u64)
+                    .wrapping_add((state_index as u64).wrapping_mul(1_000_003));
+                expand_future_state(
+                    state,
+                    board_side,
+                    catalog,
+                    state_seed,
+                    deadline,
+                    should_cancel,
+                    &mut output,
+                    &mut local_progress,
+                );
+                (output, local_progress)
+            })
+            .collect();
+
         let mut next = Vec::new();
-        for state in frontier {
-            if should_stop(deadline, should_cancel) {
-                progress.stopped_early = true;
-                return best;
-            }
-            expand_future_state(
-                state,
-                board_side,
-                catalog,
-                seed.wrapping_add(depth as u64),
-                deadline,
-                should_cancel,
-                &mut next,
-                progress,
-            );
+        for (mut states, local_progress) in expanded {
+            progress.nodes_evaluated += local_progress.nodes_evaluated;
+            progress.stopped_early |= local_progress.stopped_early;
+            next.append(&mut states);
+        }
+        if progress.stopped_early {
+            return best;
         }
         if next.is_empty() {
             break;
@@ -301,7 +335,7 @@ fn expand_future_state(
     catalog: &CardCatalog,
     seed: u64,
     deadline: Instant,
-    should_cancel: &impl Fn() -> bool,
+    should_cancel: &(impl Fn() -> bool + Sync),
     output: &mut Vec<FutureState>,
     progress: &mut SearchProgress,
 ) {
@@ -355,7 +389,7 @@ fn expand_future_state(
     }
 }
 
-fn should_stop(deadline: Instant, should_cancel: &impl Fn() -> bool) -> bool {
+fn should_stop(deadline: Instant, should_cancel: &(impl Fn() -> bool + Sync)) -> bool {
     should_cancel() || Instant::now() + Duration::from_millis(MIN_FUTURE_EXPAND_MS) >= deadline
 }
 

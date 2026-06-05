@@ -5,17 +5,23 @@
   z-index: 9999;
   width: 320px;
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 112px);
   color: #1f2933;
   background: #f8fafc;
   border: 1px solid #8795a1;
   border-radius: 8px;
   box-shadow: 0 12px 36px rgba(15, 23, 42, 0.22);
   font: 13px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  display: flex;
+  flex-direction: column;
 }
 
 #harmonies-advisor-visual-layer {
-  position: fixed;
-  inset: 0;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
   z-index: 9998;
   pointer-events: none;
 }
@@ -51,6 +57,9 @@
   display: grid;
   gap: 8px;
   padding: 10px;
+  overflow-y: auto;
+  max-height: calc(100vh - 160px);
+  scrollbar-width: thin;
 }
 
 #harmonies-advisor-root.is-collapsed .harmonies-advisor-body {
@@ -61,31 +70,33 @@
   color: #52606d;
 }
 
-.harmonies-advisor-best {
-  font-weight: 700;
-}
-
-.harmonies-advisor-steps {
-  margin: 0;
-  padding-left: 20px;
-}
-
 .harmonies-advisor-alt {
   padding: 4px 0;
   border-top: 1px solid #d9e2ec;
 }
 
-.harmonies-advisor-tiers {
+.harmonies-advisor-plans {
   display: grid;
   gap: 6px;
 }
 
-.harmonies-advisor-tier {
+.harmonies-advisor-plan {
   border-top: 1px solid #d9e2ec;
   padding-top: 6px;
 }
 
-.harmonies-advisor-tier-title {
+.harmonies-advisor-plan.is-selected {
+  border-top-color: #0f766e;
+}
+
+.harmonies-advisor-plan-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  align-items: start;
+}
+
+.harmonies-advisor-plan-title {
   width: 100%;
   padding: 3px 0;
   border: 0;
@@ -96,49 +107,47 @@
   cursor: pointer;
 }
 
-.harmonies-advisor-tier-body {
-  display: none;
-  padding-top: 4px;
-}
-
-.harmonies-advisor-tier.is-open .harmonies-advisor-tier-body {
-  display: block;
-}
-
-.harmonies-advisor-tier-body ol {
-  margin: 0;
-  padding-left: 20px;
-}
-
-.harmonies-advisor-tier-alternatives {
-  margin-top: 5px;
-}
-
-.harmonies-advisor-alt-toggle {
-  display: none;
-  justify-self: start;
-  padding: 3px 7px;
+.harmonies-advisor-plan-select {
+  padding: 3px 6px;
   border: 1px solid #bcccdc;
   border-radius: 4px;
   color: #334e68;
   background: #ffffff;
+  font: 600 11px/1.3 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   cursor: pointer;
 }
 
-.harmonies-advisor-alternatives {
+.harmonies-advisor-plan.is-selected .harmonies-advisor-plan-select {
+  border-color: #0f766e;
+  color: #0f766e;
+}
+
+.harmonies-advisor-plan-body {
   display: none;
+  padding-top: 4px;
 }
 
-#harmonies-advisor-root.has-alternatives .harmonies-advisor-alt-toggle {
-  display: inline-block;
-}
-
-#harmonies-advisor-root.show-alternatives .harmonies-advisor-alternatives {
+.harmonies-advisor-plan.is-open .harmonies-advisor-plan-body {
   display: block;
 }
 
+.harmonies-advisor-plan-body ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.harmonies-advisor-plan-alternatives {
+  margin-top: 5px;
+}
+
+.harmonies-advisor-plan-alternatives summary {
+  color: #334e68;
+  cursor: pointer;
+  font-weight: 700;
+}
+
 .harmonies-advisor-group-ring {
-  position: fixed;
+  position: absolute;
   box-sizing: border-box;
   border: 4px solid rgba(240, 180, 41, 0.88);
   border-radius: 999px;
@@ -146,7 +155,7 @@
 }
 
 .harmonies-advisor-cell-ring {
-  position: fixed;
+  position: absolute;
   box-sizing: border-box;
   border: 3px solid rgba(20, 184, 166, 0.72);
   border-radius: 999px;
@@ -154,7 +163,7 @@
 }
 
 .harmonies-advisor-step-marker {
-  position: fixed;
+  position: absolute;
   z-index: 20;
   min-width: 16px;
   min-height: 16px;

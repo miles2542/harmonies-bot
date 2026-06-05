@@ -67,6 +67,12 @@
   the first usable plan fixed and appends later streamed depth results as collapsible tiers.
 - Native service initializes Rayon to `available_parallelism - 1` search threads by default, with
   `HARMONIES_SEARCH_THREADS` override for local tuning.
+- Future search now parallelizes frontier-state expansion, not only root central-group evaluation.
+- Extension search budget is now about 100s of Rust search time, with max future depth raised to 4.
+- Extension plan panel is scrollable; every streamed plan is a named collapsible section, and selecting
+  a plan switches the visual indicators to that plan.
+- Plan visual indicators are document-anchored absolute overlays, so they stay on board cells/groups
+  during page scrolling.
 - Nature Spirit choice parsing is now gated by active-player `gamestate.args.canChooseSpirit` plus
   `actChooseSpirit`/`chooseSpirit`, avoiding stale `chooseSpirit` plans after the first-turn window.
 - Group inspector labels now use a separate fixed overlay layer and stricter visible-DOM token reads,
