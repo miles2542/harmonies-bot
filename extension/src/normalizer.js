@@ -36,8 +36,18 @@
       Array.isArray(options.centralTokenGroups) && options.centralTokenGroups.length
         ? options.centralTokenGroups
         : parseCentralGroups(gamedatas.tokensOnCentralBoard);
+    const boardCellsByPlayerId = objectValue(options.boardCellsByPlayerId) || {};
     const players = Object.entries(playersById).map(([playerId, player]) =>
-      normalizePlayer(playerId, player, gamedatas, hexes, allCubeLocations, cardCubeCounts, playerIds),
+      normalizePlayer(
+        playerId,
+        player,
+        gamedatas,
+        hexes,
+        allCubeLocations,
+        cardCubeCounts,
+        playerIds,
+        boardCellsByPlayerId,
+      ),
     );
 
     return {
@@ -53,21 +63,33 @@
     };
   }
 
-  function normalizePlayer(playerId, player, gamedatas, hexes, allCubeLocations, cardCubeCounts, playerIds) {
+  function normalizePlayer(
+    playerId,
+    player,
+    gamedatas,
+    hexes,
+    allCubeLocations,
+    cardCubeCounts,
+    playerIds,
+    boardCellsByPlayerId,
+  ) {
     const bgaIds = bgaIdsForPlayer(playerId, player, gamedatas, playerIds);
     const tokenStacks = parseTokensOnBoard(player.tokensOnBoard);
     const playerCubeLocations = new Set(allCubeLocations);
     collectSinglePlayerCubeLocations(player, playerCubeLocations);
     const playerCubeCoords = collectSinglePlayerCubeCoords(player);
+    const domCells = domCellsForPlayer(boardCellsByPlayerId, playerId, bgaIds);
     const cells = hexes.map((coord) => {
       const key = bgaIds
         .map((id) => cellKey(id, coord))
         .find((candidate) => tokenStacks.has(candidate) || playerCubeLocations.has(candidate));
       const coordKey = `${coord.col},${coord.row}`;
+      const domCell = domCells.get(coordKey);
+      const lockedByCube = Boolean((key && playerCubeLocations.has(key)) || playerCubeCoords.has(coordKey));
       return {
         coord,
-        stack: { tokens: key ? tokenStacks.get(key) || [] : [] },
-        lockedByCube: Boolean((key && playerCubeLocations.has(key)) || playerCubeCoords.has(coordKey)),
+        stack: { tokens: domCell ? domCell.tokens : key ? tokenStacks.get(key) || [] : [] },
+        lockedByCube: lockedByCube || Boolean(domCell?.lockedByCube),
       };
     });
     const activeCards = parseCards(player.boardAnimalCards, cardCubeCounts, false, {
@@ -94,7 +116,9 @@
       completedCards: parseCards(player.doneAnimalCards, cardCubeCounts, true, {
         locations: bgaIds.map((id) => `done${id}`),
       }),
-      emptyHexes: clampU8(numberValue(player.emptyHexes) || 0),
+      emptyHexes: domCells.size
+        ? clampU8(cells.filter((cell) => !cell.stack.tokens.length).length)
+        : clampU8(numberValue(player.emptyHexes) || 0),
     };
   }
 
@@ -221,6 +245,25 @@
 
   function parseTokenList(value) {
     return arrayValue(value).map(tokenColor).filter(Boolean);
+  }
+
+  function domCellsForPlayer(boardCellsByPlayerId, playerId, bgaIds) {
+    const rawCells = [playerId, ...bgaIds].map((id) => boardCellsByPlayerId[id]).find(Array.isArray) || [];
+    const cells = new Map();
+    rawCells.forEach((cell) => {
+      const col = numberValue(cell?.coord?.col);
+      const row = numberValue(cell?.coord?.row);
+      const tokens = arrayValue(cell?.stack?.tokens || cell?.tokens).filter((token) =>
+        Object.values(COLOR_BY_TYPE_ARG).includes(token),
+      );
+      if (Number.isFinite(col) && Number.isFinite(row)) {
+        cells.set(`${col},${row}`, {
+          tokens,
+          lockedByCube: Boolean(cell.lockedByCube),
+        });
+      }
+    });
+    return cells;
   }
 
   function parseCards(value, cubeCounts, completed, options = {}) {

@@ -83,3 +83,7 @@ At a fixed time cutoff, follow the `Best so far` plan unless deliberately choosi
 - `ff379e4` Refine advisor plan UI and deeper search
 - `5487ea4` Clarify advisor score labels
 - `df07d31` Add settlement arrows and best-plan badge
+
+## New Blocking Issue: Player Board DOM Freshness
+
+Live active QA showed turn 2 plan placing Field/Foliage at cells already containing Field tokens from turn 1. Conclusion: player board state from gamedatas can be stale just like central groups. Next work must make extension read current visible board DOM for analyzed player and override normalized player.cells before advisor request. Do not tune until this is fixed and verified.

@@ -18,7 +18,10 @@
         const snapshot = window.HarmoniesBgaNormalizer.normalizeGamedatas(
           gamedatas,
           perspectivePlayerId,
-          { centralTokenGroups: options.centralTokenGroups },
+          {
+            centralTokenGroups: options.centralTokenGroups,
+            boardCellsByPlayerId: options.boardCellsByPlayerId,
+          },
         );
         try {
           const response = await requestNativeAdvisor(snapshot, (partialResponse) => {

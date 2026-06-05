@@ -83,6 +83,8 @@
   so inspector QA does not move or restyle central tokens.
 - Active participant Analyze now only runs for the current user's own active turn. Spectator mode still
   analyzes the active player. Panel status includes player name plus id when BGA exposes the name.
+- Extension advisor requests now override analyzed player's board cells from visible DOM tokens, because
+  live QA showed `gamedatas.players[*].tokensOnBoard` can lag behind just like central token groups.
 
 ## Known Gaps
 
@@ -102,9 +104,8 @@
 - Opponent handling is v1 heuristic only: visible current-board value for central token groups, not full opponent future search.
 - WASM runtime gate pending; native service path exists.
 - Extension uses native service when running, streaming WebSocket first; mock fallback otherwise.
-- Live BGA extension visual QA still pending after participant-perspective patch: confirm active
-  participant Analyze never draws opponent-board indicators, while spectate Analyze still targets the
-  active player.
+- Live BGA extension visual QA still pending after DOM-board override: confirm turn-after-turn active
+  participant plans never place field/water/foliage on occupied field/water/foliage cells.
 - Live BGA spectator QA pending for the new frozen Analyze flow: confirm active-player perspective,
   central-group parsing, non-mutating overlays, and progressive depth tiers on cheap spectated games
   before spending time on real active matches.

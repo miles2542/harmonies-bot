@@ -94,7 +94,8 @@
     }
     const playerId = perspective.playerId;
     const centralTokenGroups = readDomCentralTokenGroups();
-    const stateKey = buildStateKey(gamedatas, playerId, centralTokenGroups);
+    const boardCellsByPlayerId = readDomBoardCellsByPlayerId(playerId, gamedatas);
+    const stateKey = buildStateKey(gamedatas, playerId, centralTokenGroups, boardCellsByPlayerId);
     if (!stateKey) {
       overlay.setStatus("Waiting for complete table state");
       return;
@@ -115,7 +116,7 @@
         if (activeRunId === runId && activeStateKey === stateKey) {
           overlay.renderRecommendationTier(partialResponse);
         }
-      }, playerId, { centralTokenGroups });
+      }, playerId, { centralTokenGroups, boardCellsByPlayerId });
       if (activeRunId === runId && activeStateKey === stateKey) {
         overlay.renderRecommendationTier(response);
       }
@@ -176,7 +177,12 @@
     return name ? `${name} (${playerId})` : String(playerId || "unknown");
   }
 
-  function buildStateKey(gamedatas, playerId, centralTokenGroups = readDomCentralTokenGroups()) {
+  function buildStateKey(
+    gamedatas,
+    playerId,
+    centralTokenGroups = readDomCentralTokenGroups(),
+    boardCellsByPlayerId = readDomBoardCellsByPlayerId(playerId, gamedatas),
+  ) {
     const player = gamedatas?.players?.[playerId];
     if (!player) {
       return "";
@@ -191,7 +197,7 @@
       spirits: compactCards(gamedatas?.spiritsCards),
       boardCards: compactCards(player.boardAnimalCards),
       doneCards: compactCards(player.doneAnimalCards),
-      tokensOnBoard: player.tokensOnBoard || {},
+      boardCells: boardCellsByPlayerId[playerId] || [],
       animalCubesOnBoard: player.animalCubesOnBoard || {},
       cubesOnAnimalCards: gamedatas?.cubesOnAnimalCards || {},
       emptyHexes: player.emptyHexes ?? null,
@@ -218,6 +224,52 @@
       card?.location_arg ?? null,
       card?.isSpirit ?? null,
     ]);
+  }
+
+  function readDomBoardCellsByPlayerId(playerId, gamedatas) {
+    const cells = readDomPlayerCells(playerId, gamedatas?.hexes || []);
+    return cells.length ? { [playerId]: cells } : {};
+  }
+
+  function readDomPlayerCells(playerId, hexes) {
+    if (!playerId || !Array.isArray(hexes)) {
+      return [];
+    }
+    const cells = [];
+    for (const hex of hexes) {
+      const col = Number(hex?.col);
+      const row = Number(hex?.row);
+      if (!Number.isFinite(col) || !Number.isFinite(row)) {
+        continue;
+      }
+      const cell = document.getElementById(`cell_${playerId}_${col}_${row}`);
+      if (!cell || !isVisibleElement(cell)) {
+        continue;
+      }
+      cells.push({
+        coord: { col, row },
+        stack: { tokens: domTokensInCell(cell) },
+        lockedByCube: domCubeInCell(cell),
+      });
+    }
+    return cells;
+  }
+
+  function domTokensInCell(cell) {
+    const rect = cell.getBoundingClientRect();
+    return Array.from(document.querySelectorAll(".colored-token, [class*='colored-token']"))
+      .filter((node) => isVisibleElement(node) && rectContainsCenter(rect, node.getBoundingClientRect()))
+      .map((node) => ({ color: domTokenColor(node), level: domTokenLevel(node) }))
+      .filter((token) => token.color)
+      .sort((left, right) => left.level - right.level)
+      .map((token) => token.color);
+  }
+
+  function domCubeInCell(cell) {
+    const rect = cell.getBoundingClientRect();
+    return Array.from(document.querySelectorAll(".animal-cube, [class*='animal-cube']")).some(
+      (node) => isVisibleElement(node) && rectContainsCenter(rect, node.getBoundingClientRect()),
+    );
   }
 
   function readDomCentralTokenGroups() {
@@ -287,6 +339,19 @@
       .join(" ");
     const match = /(?:^|\s)color-(\d)(?:\s|$)/.exec(className);
     return colorByTypeArg(match?.[1]);
+  }
+
+  function domTokenLevel(node) {
+    const className = String(node.className || "");
+    const matches = Array.from(className.matchAll(/(?:^|\s)level-(\d+)(?:\s|$)/g));
+    const last = matches.at(-1);
+    return last ? Number.parseInt(last[1], 10) : 1;
+  }
+
+  function rectContainsCenter(container, child) {
+    const x = child.left + child.width / 2;
+    const y = child.top + child.height / 2;
+    return x >= container.left && x <= container.right && y >= container.top && y <= container.bottom;
   }
 
   function clonePlainObject(value) {
