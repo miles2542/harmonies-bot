@@ -120,6 +120,9 @@ Verified captures:
   and `--time-budget-ms`, reporting wall/engine ms, nodes, completed depth, top group stability.
 - `tools.sweep_search_params` runs named parameter candidates over request fixtures and writes
   JSON reports under `logs/benchmarks`.
+- Training tooling smoke passed after scorer parity: `tools.train_weights` generated 5 denial-grid
+  candidates and `tools.evaluate_weights` completed a short 2-fixture/seed-1/6-turn run. This is
+  only a smoke; CMA-ES/exhaustive tuning remains pending and should wait for live QA.
 - Native search knobs are env-configurable and benchmark CLI exposes matching flags:
   `--root-beam`, `--future-beam`, `--future-branch`, `--future-depth`,
   `--refill-samples`, `--card-refill-samples`, `--hard-stop-margin-ms`,

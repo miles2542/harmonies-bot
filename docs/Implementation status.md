@@ -113,6 +113,10 @@
   covers early Spirit choice plus late active-turn search smoke.
 - CMA-ES optimizer still pending; current tuning path is grid/candidate evaluation over validated
   Rust self-play.
+- Training smoke after scorer parity:
+  `python -m tools.train_weights --validated-scorer` generated 5 denial-weight candidates, and
+  `python -m tools.evaluate_weights --skip-score-gate --max-candidates 5 --seeds 1 --turn-budget-ms 250 --max-turns 6`
+  completed. This is only a tooling smoke, not enough evidence to change production weights.
 - Early stop cancels between search phases/expansions, not inside one expensive current-turn generation.
 - Advisor now supports interleaved place/draft/settle ordering with bounded frontier search.
 - Future search does not know exact hidden animal-card deck order; river replacements are sampled from unseen standard cards.
