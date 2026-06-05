@@ -5,6 +5,7 @@ use rayon::prelude::*;
 mod deck;
 mod denial;
 mod refill;
+mod settings;
 mod types;
 
 use crate::{
@@ -19,17 +20,9 @@ use crate::{
 use deck::{initial_unseen_standard_cards, river_after_turn_with_refills};
 use denial::apply_opponent_denial;
 use refill::candidate_refills;
+use settings::SearchSettings;
 use types::{FutureState, RootCandidate};
 pub use types::{SearchOutcome, SearchProgress};
-
-const ROOT_TURN_BEAM_WIDTH: usize = 512;
-const FUTURE_TURN_BEAM_WIDTH: usize = 50;
-const FUTURE_BRANCH_WIDTH: usize = 50;
-const FUTURE_DEPTH: usize = 4;
-const REFILL_SAMPLES: usize = 10;
-const CARD_REFILL_SAMPLES: usize = 4;
-const HARD_STOP_MARGIN_MS: u64 = 6_000;
-const MIN_FUTURE_EXPAND_MS: u64 = 7_000;
 
 pub fn search_current_player_turn_with_progress(
     snapshot: &GameSnapshotV1,
@@ -43,15 +36,16 @@ pub fn search_current_player_turn_with_progress(
     should_cancel: impl Fn() -> bool + Sync,
     mut on_progress: impl FnMut(SearchOutcome),
 ) -> SearchOutcome {
-    let deadline =
-        started + Duration::from_millis(time_budget_ms.saturating_sub(HARD_STOP_MARGIN_MS));
+    let settings = SearchSettings::from_env();
+    let deadline = started
+        + Duration::from_millis(time_budget_ms.saturating_sub(settings.hard_stop_margin_ms));
     let mut progress = SearchProgress::default();
     let mut warnings = Vec::new();
     if snapshot.bag_counts.is_empty() {
         warnings.push("bag counts unavailable; future refill search disabled".into());
     }
 
-    let mut roots = root_candidates(snapshot, player, catalog, weights, &mut progress);
+    let mut roots = root_candidates(snapshot, player, catalog, weights, &settings, &mut progress);
     if roots.is_empty() {
         return SearchOutcome {
             plans: Vec::new(),
@@ -89,7 +83,7 @@ pub fn search_current_player_turn_with_progress(
         });
     }
 
-    for depth in 1..=FUTURE_DEPTH {
+    for depth in 1..=settings.future_depth {
         if progress.stopped_early || should_cancel() || Instant::now() >= deadline {
             progress.stopped_early = true;
             break;
@@ -99,6 +93,7 @@ pub fn search_current_player_turn_with_progress(
             snapshot,
             catalog,
             weights,
+            &settings,
             seed,
             depth,
             deadline,
@@ -143,6 +138,7 @@ fn root_candidates(
     player: &PlayerState,
     catalog: &CardCatalog,
     weights: &EvalWeights,
+    settings: &SearchSettings,
     progress: &mut SearchProgress,
 ) -> Vec<RootCandidate> {
     let mut roots: Vec<_> = snapshot
@@ -159,7 +155,7 @@ fn root_candidates(
                 &snapshot.river_cards,
                 catalog,
                 snapshot.board_side,
-                ROOT_TURN_BEAM_WIDTH,
+                settings.root_turn_beam_width,
             )
             .into_iter()
             .fold(Vec::<TurnSequence>::new(), |mut best_by_choice, turn| {
@@ -226,6 +222,7 @@ fn estimate_depth(
     snapshot: &GameSnapshotV1,
     catalog: &CardCatalog,
     weights: &EvalWeights,
+    settings: &SearchSettings,
     seed: u64,
     depth: usize,
     deadline: Instant,
@@ -241,11 +238,18 @@ fn estimate_depth(
                 local_progress.stopped_early = true;
                 return local_progress;
             }
-            let state = state_after_root(root, snapshot, catalog, seed.wrapping_add(index as u64));
+            let state = state_after_root(
+                root,
+                snapshot,
+                catalog,
+                settings,
+                seed.wrapping_add(index as u64),
+            );
             let future = future_value(
                 state,
                 snapshot.board_side,
                 catalog,
+                settings,
                 seed.wrapping_add(index as u64),
                 depth,
                 deadline,
@@ -269,6 +273,7 @@ fn future_value(
     initial: FutureState,
     board_side: BoardSide,
     catalog: &CardCatalog,
+    settings: &SearchSettings,
     seed: u64,
     depth_remaining: usize,
     deadline: Instant,
@@ -278,7 +283,7 @@ fn future_value(
     let mut frontier = vec![initial];
     let mut best = frontier[0].score;
     for depth in 0..depth_remaining {
-        if should_stop(deadline, should_cancel) {
+        if should_stop(deadline, should_cancel, settings) {
             progress.stopped_early = true;
             return best;
         }
@@ -288,7 +293,7 @@ fn future_value(
             .map(|(state_index, state)| {
                 let mut output = Vec::new();
                 let mut local_progress = SearchProgress::default();
-                if should_stop(deadline, should_cancel) {
+                if should_stop(deadline, should_cancel, settings) {
                     local_progress.stopped_early = true;
                     return (output, local_progress);
                 }
@@ -299,6 +304,7 @@ fn future_value(
                     state,
                     board_side,
                     catalog,
+                    settings,
                     state_seed,
                     deadline,
                     should_cancel,
@@ -322,7 +328,7 @@ fn future_value(
             break;
         }
         next.sort_by(|left, right| right.score.cmp(&left.score));
-        next.truncate(FUTURE_BRANCH_WIDTH);
+        next.truncate(settings.future_branch_width);
         best = best.max(next[0].score);
         frontier = next;
     }
@@ -333,18 +339,19 @@ fn expand_future_state(
     state: FutureState,
     board_side: BoardSide,
     catalog: &CardCatalog,
+    settings: &SearchSettings,
     seed: u64,
     deadline: Instant,
     should_cancel: &(impl Fn() -> bool + Sync),
     output: &mut Vec<FutureState>,
     progress: &mut SearchProgress,
 ) {
-    if should_stop(deadline, should_cancel) {
+    if should_stop(deadline, should_cancel, settings) {
         progress.stopped_early = true;
         return;
     }
     for (group_index, tokens) in state.central_groups.iter().enumerate() {
-        if should_stop(deadline, should_cancel) {
+        if should_stop(deadline, should_cancel, settings) {
             progress.stopped_early = true;
             return;
         }
@@ -354,10 +361,10 @@ fn expand_future_state(
             &state.river_cards,
             catalog,
             board_side,
-            FUTURE_TURN_BEAM_WIDTH,
+            settings.future_turn_beam_width,
         );
-        for turn in turns.into_iter().take(FUTURE_BRANCH_WIDTH) {
-            for refill in candidate_refills(&state.bag_counts, REFILL_SAMPLES, seed) {
+        for turn in turns.into_iter().take(settings.future_branch_width) {
+            for refill in candidate_refills(&state.bag_counts, settings.refill_samples, seed) {
                 let mut central_groups = state.central_groups.clone();
                 central_groups[group_index] = refill.clone();
                 let mut bag_counts = state.bag_counts.clone();
@@ -371,7 +378,7 @@ fn expand_future_state(
                     &state.unseen_cards,
                     catalog,
                     seed,
-                    CARD_REFILL_SAMPLES,
+                    settings.card_refill_samples,
                 ) {
                     let score = score_player(&turn.player, board_side, catalog).total();
                     progress.nodes_evaluated += 1;
@@ -389,20 +396,26 @@ fn expand_future_state(
     }
 }
 
-fn should_stop(deadline: Instant, should_cancel: &(impl Fn() -> bool + Sync)) -> bool {
-    should_cancel() || Instant::now() + Duration::from_millis(MIN_FUTURE_EXPAND_MS) >= deadline
+fn should_stop(
+    deadline: Instant,
+    should_cancel: &(impl Fn() -> bool + Sync),
+    settings: &SearchSettings,
+) -> bool {
+    should_cancel()
+        || Instant::now() + Duration::from_millis(settings.min_future_expand_ms) >= deadline
 }
 
 fn state_after_root(
     root: &RootCandidate,
     snapshot: &GameSnapshotV1,
     catalog: &CardCatalog,
+    settings: &SearchSettings,
     seed: u64,
 ) -> FutureState {
     let mut central_groups = snapshot.central_token_groups.clone();
     let refill = candidate_refills(
         &snapshot.bag_counts,
-        REFILL_SAMPLES,
+        settings.refill_samples,
         root.group_index as u64 + 1,
     )
     .into_iter()
@@ -421,7 +434,7 @@ fn state_after_root(
         &unseen_cards,
         catalog,
         seed,
-        CARD_REFILL_SAMPLES,
+        settings.card_refill_samples,
     )
     .into_iter()
     .next()

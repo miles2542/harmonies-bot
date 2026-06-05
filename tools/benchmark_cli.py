@@ -39,10 +39,12 @@ def run_once(
     catalog_path: Path,
     weights_path: Path,
     threads: int | None,
+    search_env: dict[str, str],
 ) -> RunResult:
     env = os.environ.copy()
     if threads:
         env["RAYON_NUM_THREADS"] = str(threads)
+    env.update(search_env)
     started = time.perf_counter()
     completed = subprocess.run(
         [str(executable), str(request_path), str(catalog_path), str(weights_path)],
@@ -117,13 +119,21 @@ def summarize_request(request_path: Path, runs: list[RunResult]) -> dict[str, An
 def benchmark(args: argparse.Namespace) -> dict[str, Any]:
     executable = build_cli()
     request_paths = args.request or DEFAULT_REQUESTS
+    search_env = search_env_overrides(args)
     cases = []
     with tempfile.TemporaryDirectory(prefix="harmonies_benchmark_requests_") as tmp:
         tmp_dir = Path(tmp)
         for request_path in request_paths:
             effective_request = effective_request_path(request_path, tmp_dir, args.time_budget_ms)
             runs = [
-                run_once(executable, effective_request, args.catalog, args.weights, args.threads)
+                run_once(
+                    executable,
+                    effective_request,
+                    args.catalog,
+                    args.weights,
+                    args.threads,
+                    search_env,
+                )
                 for _ in range(args.runs)
             ]
             cases.append(summarize_request(request_path, runs))
@@ -134,8 +144,23 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
         "weights": str(args.weights),
         "timeBudgetMsOverride": args.time_budget_ms,
         "rayonNumThreads": args.threads or os.environ.get("RAYON_NUM_THREADS") or "default",
+        "searchEnv": search_env,
         "cases": cases,
     }
+
+
+def search_env_overrides(args: argparse.Namespace) -> dict[str, str]:
+    mapping = {
+        "HARMONIES_ROOT_BEAM": args.root_beam,
+        "HARMONIES_FUTURE_BEAM": args.future_beam,
+        "HARMONIES_FUTURE_BRANCH": args.future_branch,
+        "HARMONIES_FUTURE_DEPTH": args.future_depth,
+        "HARMONIES_REFILL_SAMPLES": args.refill_samples,
+        "HARMONIES_CARD_REFILL_SAMPLES": args.card_refill_samples,
+        "HARMONIES_HARD_STOP_MARGIN_MS": args.hard_stop_margin_ms,
+        "HARMONIES_MIN_FUTURE_EXPAND_MS": args.min_future_expand_ms,
+    }
+    return {key: str(value) for key, value in mapping.items() if value is not None}
 
 
 def effective_request_path(
@@ -162,6 +187,14 @@ def main() -> int:
     parser.add_argument("--weights", type=Path, default=DEFAULT_WEIGHTS)
     parser.add_argument("--threads", type=int)
     parser.add_argument("--time-budget-ms", type=int)
+    parser.add_argument("--root-beam", type=int)
+    parser.add_argument("--future-beam", type=int)
+    parser.add_argument("--future-branch", type=int)
+    parser.add_argument("--future-depth", type=int)
+    parser.add_argument("--refill-samples", type=int)
+    parser.add_argument("--card-refill-samples", type=int)
+    parser.add_argument("--hard-stop-margin-ms", type=int)
+    parser.add_argument("--min-future-expand-ms", type=int)
     parser.add_argument("--out", type=Path)
     args = parser.parse_args()
 

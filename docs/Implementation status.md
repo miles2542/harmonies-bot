@@ -122,6 +122,10 @@
 - Offline benchmark tooling now supports fixture corpus runs, `RAYON_NUM_THREADS`, time-budget
   override, wall/engine timing, node counts, depth, and top-group stability:
   `python -m tools.benchmark_cli --threads 12 --time-budget-ms 30000`.
+- Native search knobs are now env-configurable for sweeps:
+  `HARMONIES_ROOT_BEAM`, `HARMONIES_FUTURE_BEAM`, `HARMONIES_FUTURE_BRANCH`,
+  `HARMONIES_FUTURE_DEPTH`, `HARMONIES_REFILL_SAMPLES`, `HARMONIES_CARD_REFILL_SAMPLES`,
+  `HARMONIES_HARD_STOP_MARGIN_MS`, `HARMONIES_MIN_FUTURE_EXPAND_MS`.
 - Search depth labels now count actual future turns. Earlier `depth 1` was zero future turns because
   `future_value` received `depth - 1`.
 - DOM/capture conversion now infers `bagCounts` from visible board/central tokens plus BGA
@@ -129,6 +133,8 @@
 - Match 14 full-hand benchmark after bag-count/depth fixes:
   - 30s budget: ~17.7s engine, 48,120 nodes, depth 1 complete, future estimate 104.
   - 100s budget: ~89.9s engine, 1,071,337 nodes, depth 1 complete, depth 2 partial, future estimate 115.
+  - 30s aggressive narrow sweep (`futureBeam=10`, `futureBranch=5`, `refillSamples=2`,
+    `cardRefillSamples=1`): ~25.9s, 8,800 nodes, depth 3 complete, future estimate 104.
 
 ## Next Phases
 
