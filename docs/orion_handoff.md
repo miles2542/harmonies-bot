@@ -111,6 +111,8 @@ Verified captures:
 Next safe work before tuning:
 
 - Reload extension and ScriptCat with latest files when user returns; new capture version should report `domCards=true`.
+- `tools/summarize_capture_visible_state.py <captures...>` prints compact active-player/card/river/central summaries for quick QA.
+- Extension now refuses manual Analyze in `gameEnd` state (`Game ended; advisor disabled`).
 - Split oversized `tools/bga_harmonies_capture.user.js` and `tools/dom_capture_to_snapshot.py` when practical; both exceed preferred 300-400 lines.
 - Add a JS fixture/unit test for normalizer card fallback guard if local test harness exists or can be small.
 - Do not start weight tuning until one live/spectate UI test confirms arrows and panel cards match visible active hand with capture `0.3.2`.

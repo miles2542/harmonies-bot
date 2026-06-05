@@ -87,6 +87,10 @@
       overlay.setStatus("Waiting for Harmonies table");
       return;
     }
+    if (isGameEnd(gamedatas)) {
+      overlay.setStatus("Game ended; advisor disabled");
+      return;
+    }
     const perspective = resolveAnalysisPerspective(gamedatas, payload);
     if (!perspective.playerId) {
       overlay.setStatus(perspective.reason || "Active player not detected");
@@ -134,6 +138,15 @@
     const activePlayer = String(gamedatas?.gamestate?.active_player || "");
     const activeName = playerLabel(gamedatas, activePlayer);
 
+    if (isGameEnd(gamedatas)) {
+      return {
+        playerId: "",
+        label: "",
+        mode: "ended",
+        reason: "Game ended; advisor disabled",
+      };
+    }
+
     if (!payload?.isSpectator && participant && players[participant]) {
       if (String(activePlayer) === String(participant)) {
         return {
@@ -174,6 +187,10 @@
     const player = gamedatas?.players?.[playerId];
     const name = player?.name || player?.player_name;
     return name ? `${name} (${playerId})` : String(playerId || "unknown");
+  }
+
+  function isGameEnd(gamedatas) {
+    return String(gamedatas?.gamestate?.name || "").toLowerCase() === "gameend";
   }
 
   function buildStateKey(gamedatas, playerId, visibleStateV1) {
