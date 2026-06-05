@@ -1,15 +1,17 @@
 // ==UserScript==
 // @name         Harmonies BGA Snapshot Capture
 // @namespace    harmonies-bga-advisor-local
-// @version      0.3.2
+// @version      0.3.3
 // @description  Read-only Harmonies snapshot capture helper for scorer validation.
 // @match        https://boardgamearena.com/*
 // @match        https://*.boardgamearena.com/*
 // @grant        GM_setClipboard
+// @grant        GM.setClipboard
 // @grant        unsafeWindow
 // ==/UserScript==
 
 (function harmoniesCaptureUserScript() {
+  const SCRIPT_VERSION = "0.3.3";
   const ROOT_ID = "harmonies-capture-panel";
   const STORAGE_KEY = "harmonies-bga-capture-latest-v2";
   const DOM_KEY_RE = /(harm|board|cell|hex|token|cube|card|animal|player|score|result)/i;
@@ -443,10 +445,13 @@
   }
 
   function installPanel() {
-    if (document.getElementById(ROOT_ID)) return;
+    const existing = document.getElementById(ROOT_ID);
+    if (existing?.dataset.version === SCRIPT_VERSION) return;
+    if (existing) existing.remove();
     const root = document.createElement("section");
     root.id = ROOT_ID;
-    root.innerHTML = `<strong>Harmonies Capture</strong><button type="button" data-action="copy">Copy</button><button type="button" data-action="download">Download</button><span data-role="status"></span>`;
+    root.dataset.version = SCRIPT_VERSION;
+    root.innerHTML = `<strong>Harmonies Capture</strong><button type="button" data-action="copy">Copy</button><button type="button" data-action="download">Download</button><span data-role="status">v${SCRIPT_VERSION}</span>`;
     root.style.cssText = ["position:fixed", "right:12px", "bottom:12px", "z-index:99999", "display:flex", "gap:6px", "align-items:center", "padding:8px", "background:#111", "color:#fff", "font:12px sans-serif", "border:1px solid #555"].join(";");
     document.documentElement.appendChild(root);
     root.querySelector("[data-action='copy']").addEventListener("click", () => copyPayload(root));
@@ -454,43 +459,86 @@
   }
 
   function copyPayload(root) {
-    try {
+    runCaptureAction(root, "copy", () => {
       const text = JSON.stringify(readPayload(), null, 2);
-      if (typeof GM_setClipboard === "function") {
-        GM_setClipboard(text);
-        setStatus(root, "copied");
-        return;
-      }
-      navigator.clipboard
-        .writeText(text)
-        .then(() => setStatus(root, "copied"))
-        .catch((error) => fail(root, error));
-    } catch (error) {
-      fail(root, error);
-    }
+      copyText(text);
+      setStatus(root, `copied ${formatBytes(text.length)}`);
+    });
   }
 
   function downloadPayload(root) {
-    try {
+    runCaptureAction(root, "download", () => {
       const blob = new Blob([JSON.stringify(readPayload(), null, 2)], { type: "application/json" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = `harmonies-gamedatas-${Date.now()}.json`;
+      link.style.display = "none";
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(link.href);
-      setStatus(root, "downloaded");
+      setTimeout(() => {
+        URL.revokeObjectURL(link.href);
+        link.remove();
+      }, 250);
+      setStatus(root, `downloaded ${formatBytes(blob.size)}`);
+    });
+  }
+
+  function runCaptureAction(root, label, action) {
+    setBusy(root, true);
+    setStatus(root, `${label}: building...`);
+    try {
+      action();
     } catch (error) {
       fail(root, error);
+    } finally {
+      setBusy(root, false);
     }
+  }
+
+  function copyText(text) {
+    if (typeof GM_setClipboard === "function") {
+      GM_setClipboard(text);
+      return;
+    }
+    if (typeof GM !== "undefined" && typeof GM.setClipboard === "function") {
+      GM.setClipboard(text);
+      return;
+    }
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch((error) => {
+        console.warn("[Harmonies Capture] async clipboard failed", error);
+      });
+      return;
+    }
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.style.cssText = "position:fixed;left:-9999px;top:0";
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    document.execCommand("copy");
+    area.remove();
   }
 
   function setStatus(root, message) {
     root.querySelector("[data-role='status']").textContent = message;
   }
 
+  function setBusy(root, busy) {
+    root.querySelectorAll("button").forEach((button) => {
+      button.disabled = busy;
+    });
+  }
+
   function fail(root, error) {
     console.error("[Harmonies Capture]", error);
     setStatus(root, `error: ${error?.message || error}`);
+  }
+
+  function formatBytes(bytes) {
+    if (!Number.isFinite(bytes)) return "";
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   window.setInterval(() => {
