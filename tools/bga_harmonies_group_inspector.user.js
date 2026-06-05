@@ -10,6 +10,7 @@
 
 (function harmoniesGroupInspector() {
   const ROOT_ID = "harmonies-group-inspector";
+  const LAYER_ID = "harmonies-group-inspector-layer";
   const LABEL_CLASS = "harmonies-group-inspector-label";
   const COLORS = {
     1: "Water",
@@ -52,12 +53,8 @@
       if (!hole) {
         continue;
       }
-      const tokenNodes = [1, 2, 3]
-        .map((tokenIndex) => document.getElementById(`hole-${groupId}-token-${tokenIndex}`))
-        .filter(Boolean);
-      groups[String(groupId)] = (tokenNodes.length
-        ? tokenNodes
-        : Array.from(hole.querySelectorAll(".hole-token, .colored-token")))
+      const tokenNodes = centralTokenNodes(hole, groupId);
+      groups[String(groupId)] = tokenNodes
         .map((node) => {
           const typeArg = domTypeArg(node);
           return { typeArg, color: colorName(typeArg), id: node.id || "" };
@@ -67,8 +64,51 @@
     return groups;
   }
 
+  function centralTokenNodes(hole, groupId) {
+    const orderedIds = [1, 2, 3]
+      .map((tokenIndex) => document.getElementById(`hole-${groupId}-token-${tokenIndex}`))
+      .filter((node) => node && hole.contains(node) && isVisibleElement(node));
+    const candidates = orderedIds.length
+      ? orderedIds
+      : Array.from(
+          hole.querySelectorAll(
+            ".hole-token, .colored-token, [class*='color-'], [id^='hole-'][id*='-token-']",
+          ),
+        ).filter(isVisibleElement);
+    const unique = [];
+    const seen = new Set();
+    candidates.forEach((node) => {
+      if (!seen.has(node)) {
+        seen.add(node);
+        unique.push(node);
+      }
+    });
+    unique.sort((left, right) => tokenNodeSortKey(left) - tokenNodeSortKey(right));
+    return unique.filter((node) => Number.isFinite(domTypeArg(node))).slice(0, 3);
+  }
+
+  function tokenNodeSortKey(node) {
+    const match = /-token-(\d+)/.exec(String(node.id || ""));
+    return match ? Number.parseInt(match[1], 10) : 99;
+  }
+
+  function isVisibleElement(node) {
+    const style = window.getComputedStyle(node);
+    const rect = node.getBoundingClientRect();
+    return (
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      Number(style.opacity || 1) > 0.01 &&
+      rect.width > 2 &&
+      rect.height > 2
+    );
+  }
+
   function domTypeArg(node) {
-    const match = /(?:^|\s)color-(\d)(?:\s|$)/.exec(String(node.className || ""));
+    const className = [node, ...node.querySelectorAll("*")]
+      .map((item) => String(item.className || ""))
+      .join(" ");
+    const match = /(?:^|\s)color-(\d)(?:\s|$)/.exec(className);
     return match ? Number(match[1]) : Number.NaN;
   }
 
@@ -113,14 +153,14 @@
     if (!hole) {
       return;
     }
-    hole.style.position = hole.style.position || "relative";
+    const rect = hole.getBoundingClientRect();
     const label = document.createElement("div");
     label.className = LABEL_CLASS;
     label.textContent = `${groupId}: ${colors.join(" / ") || "?"}`;
     label.style.cssText = [
-      "position:absolute",
-      "left:0",
-      "top:-28px",
+      "position:fixed",
+      `left:${Math.round(rect.left)}px`,
+      `top:${Math.max(0, Math.round(rect.top - 28))}px`,
       "z-index:99999",
       "max-width:180px",
       "padding:2px 5px",
@@ -131,11 +171,27 @@
       "pointer-events:none",
       "white-space:nowrap",
     ].join(";");
-    hole.appendChild(label);
+    visualLayer().appendChild(label);
   }
 
   function clearLabels() {
-    document.querySelectorAll(`.${LABEL_CLASS}`).forEach((node) => node.remove());
+    visualLayer().replaceChildren();
+  }
+
+  function visualLayer() {
+    let layer = document.getElementById(LAYER_ID);
+    if (!layer) {
+      layer = document.createElement("div");
+      layer.id = LAYER_ID;
+      layer.style.cssText = [
+        "position:fixed",
+        "inset:0",
+        "z-index:99998",
+        "pointer-events:none",
+      ].join(";");
+      document.documentElement.appendChild(layer);
+    }
+    return layer;
   }
 
   function installPanel() {

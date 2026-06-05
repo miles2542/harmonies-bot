@@ -1,5 +1,7 @@
 use std::time::{Duration, Instant};
 
+use rayon::prelude::*;
+
 mod deck;
 mod denial;
 mod refill;
@@ -105,6 +107,11 @@ pub fn search_current_player_turn_with_progress(
         );
         if !progress.stopped_early {
             progress.depth_completed = depth;
+            on_progress(SearchOutcome {
+                plans: sorted_plans(&roots, max_results),
+                progress: progress.clone(),
+                warnings: warnings.clone(),
+            });
         }
     }
 
@@ -122,6 +129,7 @@ fn sorted_plans(roots: &[RootCandidate], max_results: usize) -> Vec<MovePlanV1> 
             .utility_estimate
             .cmp(&left.utility_estimate)
             .then_with(|| right.future_estimate.cmp(&left.future_estimate))
+            .then_with(|| left.group_index.cmp(&right.group_index))
     });
     roots
         .into_iter()
@@ -137,42 +145,51 @@ fn root_candidates(
     weights: &EvalWeights,
     progress: &mut SearchProgress,
 ) -> Vec<RootCandidate> {
-    let mut roots = Vec::new();
-    for (group_index, tokens) in snapshot.central_token_groups.iter().enumerate() {
-        if tokens.len() != 3 {
-            continue;
-        }
-        let turns = generate_current_turn_sequences(
-            player,
-            tokens,
-            &snapshot.river_cards,
-            catalog,
-            snapshot.board_side,
-            ROOT_TURN_BEAM_WIDTH,
-        )
-        .into_iter()
-        .fold(Vec::<TurnSequence>::new(), |mut best_by_choice, turn| {
-            upsert_best_turn_by_spirit_choice(&mut best_by_choice, turn, snapshot, catalog);
-            best_by_choice
-        });
-        if turns.is_empty() {
-            continue;
-        }
-        for turn in turns {
-            let immediate = score_player(&turn.player, snapshot.board_side, catalog);
-            let future_estimate = immediate.total();
-            progress.nodes_evaluated += 1;
-            roots.push(RootCandidate {
-                group_index,
-                tokens: tokens.clone(),
-                turn,
-                immediate,
-                future_estimate,
-                utility_estimate: weights.utility(future_estimate, 0),
-                opponent_denial_estimate: 0,
+    let mut roots: Vec<_> = snapshot
+        .central_token_groups
+        .par_iter()
+        .enumerate()
+        .flat_map_iter(|(group_index, tokens)| {
+            if tokens.len() != 3 {
+                return Vec::new();
+            }
+            let turns = generate_current_turn_sequences(
+                player,
+                tokens,
+                &snapshot.river_cards,
+                catalog,
+                snapshot.board_side,
+                ROOT_TURN_BEAM_WIDTH,
+            )
+            .into_iter()
+            .fold(Vec::<TurnSequence>::new(), |mut best_by_choice, turn| {
+                upsert_best_turn_by_spirit_choice(&mut best_by_choice, turn, snapshot, catalog);
+                best_by_choice
             });
-        }
-    }
+            turns
+                .into_iter()
+                .map(|turn| {
+                    let immediate = score_player(&turn.player, snapshot.board_side, catalog);
+                    let future_estimate = immediate.total();
+                    RootCandidate {
+                        group_index,
+                        tokens: tokens.clone(),
+                        turn,
+                        immediate,
+                        future_estimate,
+                        utility_estimate: weights.utility(future_estimate, 0),
+                        opponent_denial_estimate: 0,
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    roots.sort_by(|left, right| {
+        left.group_index
+            .cmp(&right.group_index)
+            .then_with(|| left.utility_estimate.cmp(&right.utility_estimate))
+    });
+    progress.nodes_evaluated += roots.len();
     roots
 }
 

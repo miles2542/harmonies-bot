@@ -13,6 +13,13 @@
   font: 13px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+#harmonies-advisor-visual-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+}
+
 .harmonies-advisor-header {
   display: flex;
   align-items: center;
@@ -68,6 +75,45 @@
   border-top: 1px solid #d9e2ec;
 }
 
+.harmonies-advisor-tiers {
+  display: grid;
+  gap: 6px;
+}
+
+.harmonies-advisor-tier {
+  border-top: 1px solid #d9e2ec;
+  padding-top: 6px;
+}
+
+.harmonies-advisor-tier-title {
+  width: 100%;
+  padding: 3px 0;
+  border: 0;
+  color: #334e68;
+  background: transparent;
+  font: 700 12px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+
+.harmonies-advisor-tier-body {
+  display: none;
+  padding-top: 4px;
+}
+
+.harmonies-advisor-tier.is-open .harmonies-advisor-tier-body {
+  display: block;
+}
+
+.harmonies-advisor-tier-body ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.harmonies-advisor-tier-alternatives {
+  margin-top: 5px;
+}
+
 .harmonies-advisor-alt-toggle {
   display: none;
   justify-self: start;
@@ -91,31 +137,34 @@
   display: block;
 }
 
-.harmonies-advisor-highlight {
-  outline: 4px solid #f0b429 !important;
-  outline-offset: 3px !important;
+.harmonies-advisor-group-ring {
+  position: fixed;
+  box-sizing: border-box;
+  border: 4px solid rgba(240, 180, 41, 0.88);
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
 }
 
-.harmonies-advisor-cell-highlight {
-  position: relative !important;
-  outline: 4px solid #14b8a6 !important;
-  outline-offset: 2px !important;
+.harmonies-advisor-cell-ring {
+  position: fixed;
+  box-sizing: border-box;
+  border: 3px solid rgba(20, 184, 166, 0.72);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.68);
 }
 
 .harmonies-advisor-step-marker {
-  position: absolute;
-  right: 6px;
-  top: 6px;
+  position: fixed;
   z-index: 20;
-  min-width: 18px;
-  min-height: 18px;
-  padding: 1px 4px;
+  min-width: 16px;
+  min-height: 16px;
+  padding: 0 4px;
   border: 1px solid rgba(255, 255, 255, 0.85);
   border-radius: 999px;
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(15, 23, 42, 0.58);
+  color: rgba(255, 255, 255, 0.86);
+  background: rgba(15, 23, 42, 0.42);
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.22);
-  font: 700 11px/15px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font: 700 10px/15px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   pointer-events: none;
   text-align: center;
 }

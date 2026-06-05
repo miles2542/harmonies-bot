@@ -167,9 +167,14 @@ fn normalize_player(
         gamedatas.get("spiritsCards"),
         player_id,
         &card_cube_counts,
+        gamedatas,
     ));
-    let spirit_card_choices =
-        parse_player_spirit_choices(gamedatas.get("spiritsCards"), player_id, &card_cube_counts);
+    let spirit_card_choices = parse_player_spirit_choices(
+        gamedatas.get("spiritsCards"),
+        player_id,
+        &card_cube_counts,
+        gamedatas,
+    );
 
     PlayerState {
         player_id: player_id.to_owned(),
@@ -310,7 +315,9 @@ fn parse_player_spirits(
     value: Option<&Value>,
     player_id: &str,
     cube_counts: &HashMap<u32, u8>,
+    gamedatas: &Value,
 ) -> Vec<ActiveCard> {
+    let in_choice_state = is_spirit_choice_state(gamedatas, player_id);
     value
         .and_then(Value::as_array)
         .into_iter()
@@ -322,7 +329,13 @@ fn parse_player_spirits(
         })
         .filter_map(|card| {
             let card_id = card.get("id")?.as_u64()? as u32;
-            let remaining_cubes = cube_counts.get(&card_id).copied()?;
+            let remaining_cubes = cube_counts.get(&card_id).copied().or_else(|| {
+                if in_choice_state {
+                    None
+                } else {
+                    Some(1)
+                }
+            })?;
             Some(ActiveCard {
                 card_id,
                 type_arg: card.get("type_arg")?.as_u64()? as u8,
@@ -337,7 +350,11 @@ fn parse_player_spirit_choices(
     value: Option<&Value>,
     player_id: &str,
     cube_counts: &HashMap<u32, u8>,
+    gamedatas: &Value,
 ) -> Vec<ActiveCard> {
+    if !is_spirit_choice_state(gamedatas, player_id) {
+        return Vec::new();
+    }
     value
         .and_then(Value::as_array)
         .into_iter()
@@ -360,6 +377,37 @@ fn parse_player_spirit_choices(
             })
         })
         .collect()
+}
+
+fn is_spirit_choice_state(gamedatas: &Value, player_id: &str) -> bool {
+    let Some(state) = gamedatas.get("gamestate") else {
+        return false;
+    };
+    let can_choose = state
+        .get("args")
+        .and_then(|args| args.get("canChooseSpirit"))
+        .map(value_bool)
+        .unwrap_or(false);
+    if !can_choose {
+        return false;
+    }
+    if let Some(active_player) = active_player_id(gamedatas) {
+        if active_player != player_id {
+            return false;
+        }
+    }
+    state
+        .get("possibleactions")
+        .and_then(Value::as_array)
+        .map(|actions| {
+            actions.iter().any(|action| {
+                action
+                    .as_str()
+                    .map(|name| name == "actChooseSpirit" || name == "chooseSpirit")
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(true)
 }
 
 fn count_card_cubes(value: Option<&Value>) -> HashMap<u32, u8> {
@@ -405,6 +453,14 @@ fn value_matches_id(value: &Value, player_id: &str) -> bool {
         .as_str()
         .map(|raw| raw == player_id)
         .or_else(|| value.as_u64().map(|raw| raw.to_string() == player_id))
+        .unwrap_or(false)
+}
+
+fn value_bool(value: &Value) -> bool {
+    value
+        .as_bool()
+        .or_else(|| value.as_str().map(|raw| raw == "true" || raw == "1"))
+        .or_else(|| value.as_u64().map(|raw| raw != 0))
         .unwrap_or(false)
 }
 

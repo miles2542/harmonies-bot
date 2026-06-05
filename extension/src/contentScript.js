@@ -7,16 +7,21 @@
   let latestPayload = null;
   let isAnalyzing = false;
   let activeStateKey = "";
+  let activeRunId = 0;
   overlay.onAnalyze(() => {
     handleAnalyzeClick().catch((error) => {
+      activeRunId += 1;
       isAnalyzing = false;
+      activeStateKey = "";
       overlay.setAnalyzeLabel("Retry");
       overlay.setStatus(`Advisor error: ${error.message}`);
     });
   });
   overlay.onStop(() => {
+    activeRunId += 1;
     advisorClient.stop();
     isAnalyzing = false;
+    activeStateKey = "";
     overlay.setAnalyzeLabel("Retry");
     overlay.setStatus("Search stopped");
   });
@@ -63,34 +68,30 @@
       overlay.setStatus("Waiting for Harmonies table");
       return;
     }
-    if (!isActiveParticipant(gamedatas, latestPayload)) {
-      const detected = getCurrentPlayerId(gamedatas, latestPayload) || "none";
-      overlay.setStatus(`Participant not detected; player ${detected}`);
-      return;
-    }
     if (!isAnalyzing && !activeStateKey) {
-      overlay.setStatus("Ready to analyze current state");
+      const perspective = resolveAnalysisPerspective(gamedatas, latestPayload);
+      overlay.setStatus(
+        perspective
+          ? `Ready to analyze active player ${perspective}`
+          : "Waiting for active player state",
+      );
     }
   }
 
   async function handleAnalyzeClick() {
     const payload = latestPayload;
-    const gamedatas = payload?.gamedatas;
+    const gamedatas = clonePlainObject(payload?.gamedatas);
     if (!isHarmoniesGame(gamedatas)) {
       overlay.setStatus("Waiting for Harmonies table");
       return;
     }
-    if (!isActiveParticipant(gamedatas, payload)) {
-      overlay.setStatus("Participant not detected");
+    const playerId = resolveAnalysisPerspective(gamedatas, payload);
+    if (!playerId) {
+      overlay.setStatus("Active player not detected");
       return;
     }
-
-    const playerId = getCurrentPlayerId(gamedatas, payload);
-    if (!isOurActionPhase(gamedatas, playerId)) {
-      overlay.setStatus("Waiting for your active action phase");
-      return;
-    }
-    const stateKey = buildStateKey(gamedatas, playerId);
+    const centralTokenGroups = readDomCentralTokenGroups();
+    const stateKey = buildStateKey(gamedatas, playerId, centralTokenGroups);
     if (!stateKey) {
       overlay.setStatus("Waiting for complete table state");
       return;
@@ -101,21 +102,24 @@
 
     isAnalyzing = true;
     activeStateKey = stateKey;
-    overlay.setAnalyzeLabel("Analyze");
+    const runId = activeRunId + 1;
+    activeRunId = runId;
+    overlay.beginAnalysis();
+    overlay.setAnalyzeLabel("Analyzing");
     overlay.setStatus("Analyzing visible state");
-    const centralTokenGroups = readDomCentralTokenGroups();
     try {
       const response = await advisorClient.getRecommendation(gamedatas, (partialResponse) => {
-        if (activeStateKey === stateKey) {
-          overlay.renderRecommendation(partialResponse);
+        if (activeRunId === runId && activeStateKey === stateKey) {
+          overlay.renderRecommendationTier(partialResponse);
         }
       }, playerId, { centralTokenGroups });
-      if (activeStateKey === stateKey) {
-        overlay.renderRecommendation(response);
+      if (activeRunId === runId && activeStateKey === stateKey) {
+        overlay.renderRecommendationTier(response);
       }
     } finally {
-      if (activeStateKey === stateKey) {
+      if (activeRunId === runId && activeStateKey === stateKey) {
         isAnalyzing = false;
+        activeStateKey = "";
         overlay.setAnalyzeLabel("Retry");
       }
     }
@@ -125,7 +129,20 @@
     return String(gamedatas?.gamestate?.active_player || "") === String(playerId);
   }
 
-  function buildStateKey(gamedatas, playerId) {
+  function resolveAnalysisPerspective(gamedatas, payload) {
+    const players = gamedatas?.players || {};
+    const activePlayer = String(gamedatas?.gamestate?.active_player || "");
+    if (activePlayer && players[activePlayer]) {
+      return activePlayer;
+    }
+    const participant = getCurrentPlayerId(gamedatas, payload);
+    if (participant && players[participant] && isOurActionPhase(gamedatas, participant)) {
+      return participant;
+    }
+    return Object.keys(players)[0] || "";
+  }
+
+  function buildStateKey(gamedatas, playerId, centralTokenGroups = readDomCentralTokenGroups()) {
     const player = gamedatas?.players?.[playerId];
     if (!player) {
       return "";
@@ -135,7 +152,7 @@
       activePlayer: gamedatas?.gamestate?.active_player || "",
       stateName: gamedatas?.gamestate?.name || "",
       remainingTokens: gamedatas?.remainingTokens ?? null,
-      central: readDomCentralTokenGroups(),
+      central: centralTokenGroups,
       river: compactCards(gamedatas?.river),
       spirits: compactCards(gamedatas?.spiritsCards),
       boardCards: compactCards(player.boardAnimalCards),
@@ -176,10 +193,8 @@
       if (!hole) {
         continue;
       }
-      const tokenNodes = [1, 2, 3]
-        .map((tokenIndex) => document.getElementById(`hole-${groupId}-token-${tokenIndex}`))
-        .filter(Boolean);
-      const tokens = (tokenNodes.length ? tokenNodes : Array.from(hole.querySelectorAll(".hole-token, .colored-token")))
+      const tokenNodes = centralTokenNodes(hole, groupId);
+      const tokens = tokenNodes
         .map(domTokenColor)
         .filter(Boolean);
       groups.push(tokens);
@@ -192,10 +207,63 @@
     );
   }
 
+  function centralTokenNodes(hole, groupId) {
+    const orderedIds = [1, 2, 3]
+      .map((tokenIndex) => document.getElementById(`hole-${groupId}-token-${tokenIndex}`))
+      .filter((node) => node && hole.contains(node) && isVisibleElement(node));
+    const candidates = orderedIds.length
+      ? orderedIds
+      : Array.from(
+          hole.querySelectorAll(
+            ".hole-token, .colored-token, [class*='color-'], [id^='hole-'][id*='-token-']",
+          ),
+        ).filter(isVisibleElement);
+    const unique = [];
+    const seen = new Set();
+    candidates.forEach((node) => {
+      if (!seen.has(node)) {
+        seen.add(node);
+        unique.push(node);
+      }
+    });
+    unique.sort((left, right) => tokenNodeSortKey(left) - tokenNodeSortKey(right));
+    return unique.filter((node) => domTokenColor(node)).slice(0, 3);
+  }
+
+  function tokenNodeSortKey(node) {
+    const match = /-token-(\d+)/.exec(String(node.id || ""));
+    return match ? Number.parseInt(match[1], 10) : 99;
+  }
+
+  function isVisibleElement(node) {
+    const style = window.getComputedStyle(node);
+    const rect = node.getBoundingClientRect();
+    return (
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      Number(style.opacity || 1) > 0.01 &&
+      rect.width > 2 &&
+      rect.height > 2
+    );
+  }
+
   function domTokenColor(node) {
-    const className = String(node.className || "");
+    const className = [node, ...node.querySelectorAll("*")]
+      .map((item) => String(item.className || ""))
+      .join(" ");
     const match = /(?:^|\s)color-(\d)(?:\s|$)/.exec(className);
     return colorByTypeArg(match?.[1]);
+  }
+
+  function clonePlainObject(value) {
+    if (!value) {
+      return value;
+    }
+    try {
+      return structuredClone(value);
+    } catch (_error) {
+      return JSON.parse(JSON.stringify(value));
+    }
   }
 
   function colorByTypeArg(typeArg) {

@@ -59,6 +59,18 @@
   are readable, falling back to `gamedatas.tokensOnCentralBoard`.
 - `tools/bga_harmonies_group_inspector.user.js` compares visible DOM central groups against
   `gamedatas` and labels holes for active/spectated parser QA.
+- Extension `Analyze` now also works in spectator mode by freezing the clicked state and analyzing
+  from the current active player's perspective through the same JS normalizer/native service path.
+- Extension visual annotations are now separate fixed overlay elements. They no longer add classes,
+  append markers, or change style on BGA board, cell, central-hole, or token nodes.
+- Advisor WebSocket progress now emits after each completed future-search depth. The overlay keeps
+  the first usable plan fixed and appends later streamed depth results as collapsible tiers.
+- Native service initializes Rayon to `available_parallelism - 1` search threads by default, with
+  `HARMONIES_SEARCH_THREADS` override for local tuning.
+- Nature Spirit choice parsing is now gated by active-player `gamestate.args.canChooseSpirit` plus
+  `actChooseSpirit`/`chooseSpirit`, avoiding stale `chooseSpirit` plans after the first-turn window.
+- Group inspector labels now use a separate fixed overlay layer and stricter visible-DOM token reads,
+  so inspector QA does not move or restyle central tokens.
 
 ## Known Gaps
 
@@ -75,3 +87,6 @@
 - Extension uses native service when running, streaming WebSocket first; mock fallback otherwise.
 - Live BGA extension visual QA still pending after manual-flow patch: confirm DOM group inspector,
   highlighted cells/groups, and first-turn Spirit plan on active table.
+- Live BGA spectator QA pending for the new frozen Analyze flow: confirm active-player perspective,
+  central-group parsing, non-mutating overlays, and progressive depth tiers on cheap spectated games
+  before spending time on real active matches.

@@ -71,11 +71,11 @@
       };
     });
     const activeCards = parseCards(player.boardAnimalCards, cardCubeCounts, false);
-    const playerSpirits = parsePlayerSpirits(gamedatas.spiritsCards, playerId, cardCubeCounts, gamedatas);
+    const playerSpirits = parsePlayerSpirits(gamedatas.spiritsCards, playerId, cardCubeCounts, gamedatas, playerIds);
     activeCards.push(...playerSpirits);
     const spiritCardChoices = playerSpirits.length
       ? []
-      : parsePlayerSpiritChoices(gamedatas.spiritsCards, playerId, cardCubeCounts, gamedatas);
+      : parsePlayerSpiritChoices(gamedatas.spiritsCards, playerId, cardCubeCounts, gamedatas, playerIds);
 
     return {
       playerId,
@@ -233,8 +233,8 @@
       .filter(Boolean);
   }
 
-  function parsePlayerSpirits(value, playerId, cubeCounts, gamedatas) {
-    const inChoiceState = isSpiritChoiceState(gamedatas);
+  function parsePlayerSpirits(value, playerId, cubeCounts, gamedatas, playerIds) {
+    const inChoiceState = isSpiritChoiceState(gamedatas, playerId, playerIds);
     return arrayValue(value)
       .filter((card) => String(card.location_arg) === playerId)
       .map((card) => {
@@ -256,8 +256,8 @@
       .filter(Boolean);
   }
 
-  function parsePlayerSpiritChoices(value, playerId, cubeCounts, gamedatas) {
-    if (!isSpiritChoiceState(gamedatas)) {
+  function parsePlayerSpiritChoices(value, playerId, cubeCounts, gamedatas, playerIds) {
+    if (!isSpiritChoiceState(gamedatas, playerId, playerIds)) {
       return [];
     }
     return arrayValue(value)
@@ -278,11 +278,23 @@
       .filter(Boolean);
   }
 
-  function isSpiritChoiceState(gamedatas) {
+  function isSpiritChoiceState(gamedatas, playerId, playerIds) {
+    const args = gamedatas?.gamestate?.args || {};
+    if (args.canChooseSpirit !== true && args.canChooseSpirit !== "true") {
+      return false;
+    }
+    const activePlayer = normalizePlayerId(readActivePlayerId(gamedatas), playerIds || new Map());
+    if (activePlayer && playerId && activePlayer !== playerId) {
+      return false;
+    }
+    const possibleActions = arrayValue(gamedatas?.gamestate?.possibleactions);
+    if (possibleActions.includes("actChooseSpirit") || possibleActions.includes("chooseSpirit")) {
+      return true;
+    }
     const text = `${gamedatas?.gamestate?.name || ""} ${
       gamedatas?.gamestate?.description || ""
     }`.toLowerCase();
-    return text.includes("spirit") && text.includes("choose");
+    return text.includes("choose one") && text.includes("spirit");
   }
 
   function remainingCubeCount(card, cardId, cubeCounts) {

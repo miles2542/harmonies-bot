@@ -25,6 +25,13 @@ $env:HARMONIES_WEIGHTS='docs\weights.baseline.json'
 cargo run -p harmonies-service
 ```
 
+Optional CPU thread cap. By default the native search uses available logical CPUs minus one:
+
+```powershell
+$env:HARMONIES_SEARCH_THREADS='15'
+cargo run -p harmonies-service
+```
+
 Service smoke:
 
 ```powershell
@@ -39,7 +46,9 @@ This starts a temporary local service, checks `/health`, `/advise`, and `/ws`, t
 - Reads `window.gameui.gamedatas`.
 - Posts snapshots to content script.
 - Caches latest visible table state.
-- Sends normalized snapshot to local Rust service only when `Analyze` is pressed.
+- Sends a frozen normalized snapshot to local Rust service only when `Analyze` is pressed.
+- In spectator mode, analyzes from the current active player's perspective.
+- Keeps the first usable plan fixed and appends later streamed depth results as collapsible tiers.
 - Falls back to mock recommendation when local service is unavailable.
 - Never clicks, never calls `ajaxcall`, never sends BGA action requests.
 
@@ -54,16 +63,17 @@ unexpected manifest permissions.
 
 ## Live QA Checklist
 
-Use a real active 2-player Side A Nature Spirit table.
+Prefer a spectated 2-player Side A Nature Spirit table for parser/UI checks. Use a real active table
+only for final end-to-end flow checks.
 
 1. Run `cargo run -p harmonies-service`.
 2. Load `extension/manifest.json` from `about:debugging#/runtime/this-firefox`.
-3. Open table on your turn before any action.
+3. Open a spectated active table or your own table before any action.
 4. Press `Analyze`.
-5. Confirm panel status changes from analyzing to ready.
+5. Confirm panel status changes from analyzing to ready and shows the active player's plan.
 6. Confirm first-turn plans show `Choose Spirit` before `Take group`.
-7. Confirm chosen central group `#hole-N` has yellow outline.
-8. Confirm recommended board cells have teal outline and corner step badges matching text steps.
+7. Confirm chosen central group has a yellow overlay ring.
+8. Confirm recommended board cells have teal overlay rings and small corner step badges matching text steps.
 9. Press `Stop` during search; button should change to retry behavior, with no BGA action performed.
 10. Watch network/devtools: no BGA action requests, only localhost advisor traffic.
 
@@ -72,6 +82,6 @@ Use a real active 2-player Side A Nature Spirit table.
 For central-token parser QA, install `tools\bga_harmonies_group_inspector.user.js` in
 ScriptCat/Tampermonkey. It works in active and spectated games.
 
-- `Inspect`: labels `#hole-1..5` and logs DOM vs `gamedatas.tokensOnCentralBoard` to console.
+- `Inspect`: overlays labels for `#hole-1..5` and logs DOM vs `gamedatas.tokensOnCentralBoard` to console.
 - Green label: DOM and `gamedatas` match by token multiset.
 - Red label: mismatch; capture/share screenshot plus console table.

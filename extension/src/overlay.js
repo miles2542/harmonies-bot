@@ -1,13 +1,15 @@
 (function harmoniesAdvisorOverlayModule() {
   const ROOT_ID = "harmonies-advisor-root";
-  const HIGHLIGHT_CLASS = "harmonies-advisor-highlight";
-  const CELL_HIGHLIGHT_CLASS = "harmonies-advisor-cell-highlight";
-  const MARKER_CLASS = "harmonies-advisor-step-marker";
+  const VISUAL_LAYER_ID = "harmonies-advisor-visual-layer";
 
   function createOverlay() {
     const existing = document.getElementById(ROOT_ID);
     if (existing) {
       existing.remove();
+    }
+    const existingLayer = document.getElementById(VISUAL_LAYER_ID);
+    if (existingLayer) {
+      existingLayer.remove();
     }
 
     const root = document.createElement("section");
@@ -25,6 +27,7 @@
         <div class="harmonies-advisor-status">Starting</div>
         <div class="harmonies-advisor-best"></div>
         <ol class="harmonies-advisor-steps"></ol>
+        <div class="harmonies-advisor-tiers"></div>
         <button type="button" class="harmonies-advisor-alt-toggle" data-action="alternatives">
           Alternatives
         </button>
@@ -32,6 +35,11 @@
       </div>
     `;
     document.documentElement.appendChild(root);
+    const visualLayer = document.createElement("div");
+    visualLayer.id = VISUAL_LAYER_ID;
+    document.documentElement.appendChild(visualLayer);
+    const renderedTierKeys = new Set();
+    let primaryRendered = false;
 
     root.querySelector("[data-action='toggle']").addEventListener("click", () => {
       root.classList.toggle("is-collapsed");
@@ -53,27 +61,47 @@
       setStatus(message) {
         root.querySelector(".harmonies-advisor-status").textContent = message;
       },
-      renderRecommendation(response) {
-        clearHighlights();
+      beginAnalysis() {
+        renderedTierKeys.clear();
+        primaryRendered = false;
+        clearVisualLayer();
+        root.classList.remove("has-alternatives", "show-alternatives");
+        root.querySelector(".harmonies-advisor-best").textContent = "";
+        root.querySelector(".harmonies-advisor-steps").replaceChildren();
+        root.querySelector(".harmonies-advisor-tiers").replaceChildren();
+        root.querySelector(".harmonies-advisor-alternatives").replaceChildren();
+      },
+      renderRecommendationTier(response) {
         this.setStatus(response.status);
+        const bestMove = response.bestMove;
+        const tierKey = tierId(response);
+        if (!bestMove || renderedTierKeys.has(tierKey)) {
+          if (!bestMove) {
+            root.querySelector(".harmonies-advisor-best").textContent = "No recommendation";
+          }
+          return;
+        }
+        renderedTierKeys.add(tierKey);
 
         const best = root.querySelector(".harmonies-advisor-best");
         const steps = root.querySelector(".harmonies-advisor-steps");
         const alternatives = root.querySelector(".harmonies-advisor-alternatives");
+        const tiers = root.querySelector(".harmonies-advisor-tiers");
         const responseAlternatives = response.alternatives || [];
         const hasAlternatives = responseAlternatives.length > 0;
-        root.classList.toggle("has-alternatives", hasAlternatives);
+        root.classList.toggle("has-alternatives", hasAlternatives || root.classList.contains("has-alternatives"));
         root.classList.toggle("show-alternatives", false);
-        best.textContent = response.bestMove?.title || "No recommendation";
-        steps.replaceChildren(...(response.bestMove?.steps || []).map(renderStep));
-        alternatives.replaceChildren(...responseAlternatives.map(renderAlternative));
 
-        if (response.bestMove?.centralGroupId) {
-          highlightCentralGroup(response.bestMove.centralGroupId);
+        if (!primaryRendered) {
+          primaryRendered = true;
+          best.textContent = bestMove.title;
+          steps.replaceChildren(...(bestMove.steps || []).map(renderStep));
+          alternatives.replaceChildren(...responseAlternatives.map(renderAlternative));
+          clearVisualLayer();
+          drawPlanOverlays(bestMove);
+          return;
         }
-        if (response.bestMove) {
-          highlightBoardActions(response.bestMove);
-        }
+        tiers.appendChild(renderTier(response));
       },
     };
   }
@@ -91,7 +119,51 @@
     return item;
   }
 
-  function highlightCentralGroup(groupId) {
+  function renderTier(response) {
+    const tier = document.createElement("section");
+    tier.className = "harmonies-advisor-tier";
+    const title = document.createElement("button");
+    title.type = "button";
+    title.className = "harmonies-advisor-tier-title";
+    title.textContent = `${tierLabel(response)}: ${response.bestMove.title}`;
+    const body = document.createElement("div");
+    body.className = "harmonies-advisor-tier-body";
+    const steps = document.createElement("ol");
+    steps.replaceChildren(...(response.bestMove.steps || []).map(renderStep));
+    const alternatives = document.createElement("div");
+    alternatives.className = "harmonies-advisor-tier-alternatives";
+    alternatives.replaceChildren(...(response.alternatives || []).map(renderAlternative));
+    body.append(steps, alternatives);
+    title.addEventListener("click", () => tier.classList.toggle("is-open"));
+    tier.append(title, body);
+    return tier;
+  }
+
+  function tierLabel(response) {
+    const progress = response.progress || {};
+    const depth = progress.depthCompleted || 0;
+    const elapsed = response.elapsedMs ?? 0;
+    return `Depth ${depth}, ${elapsed}ms`;
+  }
+
+  function tierId(response) {
+    const progress = response.progress || {};
+    return [
+      response.elapsedMs ?? 0,
+      progress.depthCompleted || 0,
+      progress.nodesEvaluated || 0,
+      response.bestMove?.title || "",
+    ].join(":");
+  }
+
+  function drawPlanOverlays(bestMove) {
+    if (bestMove.centralGroupId) {
+      drawCentralGroupOverlay(bestMove.centralGroupId);
+    }
+    drawBoardActionOverlays(bestMove);
+  }
+
+  function drawCentralGroupOverlay(groupId) {
     const selectors = [
       `#hole-${CSS.escape(groupId)}`,
       `[data-hole='${CSS.escape(groupId)}']`,
@@ -100,13 +172,13 @@
     for (const selector of selectors) {
       const target = document.querySelector(selector);
       if (target) {
-        target.classList.add(HIGHLIGHT_CLASS);
+        addRectOverlay(target, "harmonies-advisor-group-ring");
         return;
       }
     }
   }
 
-  function highlightBoardActions(bestMove) {
+  function drawBoardActionOverlays(bestMove) {
     const playerId = bestMove.playerId;
     if (!playerId) {
       return;
@@ -119,8 +191,8 @@
       if (!cell) {
         return;
       }
-      cell.classList.add(CELL_HIGHLIGHT_CLASS);
-      appendStepMarker(cell, String(index + 1), action.kind);
+      addRectOverlay(cell, "harmonies-advisor-cell-ring");
+      addStepMarker(cell, String(index + 1), action.kind);
     });
   }
 
@@ -129,25 +201,40 @@
     return document.getElementById(cellId);
   }
 
-  function appendStepMarker(cell, label, kind) {
-    let marker = cell.querySelector(`.${MARKER_CLASS}`);
-    if (!marker) {
-      marker = document.createElement("span");
-      marker.className = MARKER_CLASS;
-      marker.dataset.kind = kind;
-      cell.appendChild(marker);
+  function addRectOverlay(target, className) {
+    const rect = target.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
     }
-    marker.textContent = marker.textContent ? `${marker.textContent},${label}` : label;
+    const overlay = document.createElement("div");
+    overlay.className = className;
+    overlay.style.left = `${rect.left}px`;
+    overlay.style.top = `${rect.top}px`;
+    overlay.style.width = `${rect.width}px`;
+    overlay.style.height = `${rect.height}px`;
+    visualLayer().appendChild(overlay);
   }
 
-  function clearHighlights() {
-    document
-      .querySelectorAll(`.${HIGHLIGHT_CLASS}`)
-      .forEach((node) => node.classList.remove(HIGHLIGHT_CLASS));
-    document
-      .querySelectorAll(`.${CELL_HIGHLIGHT_CLASS}`)
-      .forEach((node) => node.classList.remove(CELL_HIGHLIGHT_CLASS));
-    document.querySelectorAll(`.${MARKER_CLASS}`).forEach((node) => node.remove());
+  function addStepMarker(cell, label, kind) {
+    const rect = cell.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+    const marker = document.createElement("span");
+    marker.className = "harmonies-advisor-step-marker";
+    marker.dataset.kind = kind;
+    marker.textContent = label;
+    marker.style.left = `${rect.left + rect.width - 16}px`;
+    marker.style.top = `${rect.top + 4}px`;
+    visualLayer().appendChild(marker);
+  }
+
+  function visualLayer() {
+    return document.getElementById(VISUAL_LAYER_ID);
+  }
+
+  function clearVisualLayer() {
+    visualLayer()?.replaceChildren();
   }
 
   window.HarmoniesAdvisorOverlay = { createOverlay };

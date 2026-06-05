@@ -1,7 +1,7 @@
 (function harmoniesAdvisorClientModule() {
   const SERVICE_URL = "http://127.0.0.1:17848/advise";
   const SERVICE_WS_URL = "ws://127.0.0.1:17848/ws";
-  const SERVICE_TIMEOUT_MS = 50000;
+  const SERVICE_TIMEOUT_MS = 65000;
   const COLOR_LABELS = {
     water: "Water",
     mountain: "Mountain",
@@ -53,7 +53,7 @@
   function buildAdvisorRequest(snapshot) {
     return {
       snapshot,
-      timeBudgetMs: 48000,
+      timeBudgetMs: 56000,
       maxResults: 3,
       seed: optionsSeed(snapshot),
       runtimeMode: "native-service",
@@ -151,6 +151,8 @@
     const progress = response.progress || {};
     return {
       status: statusText(response, progress),
+      elapsedMs: response.elapsedMs || 0,
+      progress,
       bestMove: best
         ? {
             playerId: snapshot?.perspectivePlayerId || "",

@@ -34,6 +34,7 @@ struct AppState {
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> anyhow::Result<()> {
     let config = ServiceConfig::from_env();
+    initialize_search_threads(config.search_threads);
     let catalog = load_catalog(&config.catalog_path)?;
     let weights = load_weights(&config.weights_path).unwrap_or_default();
     let state = Arc::new(AppState {
@@ -57,6 +58,12 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("service stopped with error")?;
     Ok(())
+}
+
+fn initialize_search_threads(search_threads: usize) {
+    let _ = rayon::ThreadPoolBuilder::new()
+        .num_threads(search_threads.max(1))
+        .build_global();
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -216,6 +223,7 @@ struct ServiceConfig {
     addr: SocketAddr,
     catalog_path: PathBuf,
     weights_path: PathBuf,
+    search_threads: usize,
 }
 
 impl ServiceConfig {
@@ -235,10 +243,19 @@ impl ServiceConfig {
         let weights_path = std::env::var("HARMONIES_WEIGHTS")
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from("docs/weights.baseline.json"));
+        let default_threads = std::thread::available_parallelism()
+            .map(|threads| threads.get().saturating_sub(1).max(1))
+            .unwrap_or(1);
+        let search_threads = std::env::var("HARMONIES_SEARCH_THREADS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(default_threads);
         Self {
             addr,
             catalog_path,
             weights_path,
+            search_threads,
         }
     }
 }
