@@ -139,6 +139,9 @@
     `cardRefillSamples=1`): ~25.9s, 8,800 nodes, depth 3 complete, future estimate 104.
 - Match 14 near-end aggressive narrow sweep smoke: 15s budget, ~7.5s engine, 4,169 nodes,
   depth 4 complete.
+- 30s two-fixture sweep report: `logs/benchmarks/search-param-sweep-match14-30s.json`.
+  `balanced_narrow` currently best small-sweep candidate: full-hand future 115 at depth 2 partial,
+  near-end future 129 with depth 4 complete.
 
 ## Next Phases
 

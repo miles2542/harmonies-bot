@@ -128,6 +128,9 @@ Verified captures:
   - 30s aggressive narrow sweep (`futureBeam=10`, `futureBranch=5`, `refillSamples=2`,
     `cardRefillSamples=1`): ~25.9s, 8,800 nodes, depth 3 complete, future estimate 104.
 - Match 14 near-end aggressive narrow sweep smoke: 15s budget, ~7.5s, 4,169 nodes, depth 4 complete.
+- 30s two-fixture sweep report written to `logs/benchmarks/search-param-sweep-match14-30s.json`.
+  `balanced_narrow` is current best small-sweep candidate: full-hand future 115 at depth 2 partial,
+  near-end future 129 with depth 4 complete.
 
 Next safe work before tuning:
 
