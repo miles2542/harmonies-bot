@@ -38,6 +38,20 @@ $env:HARMONIES_SEARCH_THREADS='15'
 cargo run --release -p harmonies-service
 ```
 
+Current offline best small-sweep search knobs for live QA:
+
+```powershell
+$env:HARMONIES_WEIGHTS='docs\weights.baseline.json'
+$env:HARMONIES_SEARCH_THREADS='12'
+$env:HARMONIES_FUTURE_BEAM='16'
+$env:HARMONIES_FUTURE_BRANCH='8'
+$env:HARMONIES_REFILL_SAMPLES='3'
+$env:HARMONIES_CARD_REFILL_SAMPLES='1'
+$env:HARMONIES_HARD_STOP_MARGIN_MS='3000'
+$env:HARMONIES_MIN_FUTURE_EXPAND_MS='1500'
+cargo run --release -p harmonies-service
+```
+
 Service smoke:
 
 ```powershell
