@@ -155,8 +155,10 @@
 - Match 14 near-end balanced-narrow 30s smoke after cached scoring: ~5.0s engine, 10,877 nodes,
   depth 4 complete, future estimate 129.
 - 30s two-fixture sweep report: `logs/benchmarks/search-param-sweep-match14-30s.json`.
-  `balanced_narrow` currently best small-sweep candidate: full-hand future 115 at depth 2 partial,
-  near-end future 129 with depth 4 complete.
+  New post-cached-score sweep report:
+  `logs/benchmarks/search-param-sweep-match14-30s-after-cached-scoring.json`.
+  `aggressive_narrow` is current small-sweep live-QA profile: full-hand ~11.6s, depth 4,
+  future 139; near-end ~4.1s, depth 4, future 129.
 
 ## Next Phases
 
