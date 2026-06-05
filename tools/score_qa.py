@@ -4,9 +4,15 @@ import argparse
 import json
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+try:
+    from tools.dom_capture_to_snapshot import convert as convert_capture
+except ModuleNotFoundError:
+    from dom_capture_to_snapshot import convert as convert_capture
 
 
 @dataclass(frozen=True)
@@ -62,6 +68,20 @@ def load_snapshot(snapshot: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise SystemExit("snapshot root must be a JSON object")
     return data
+
+
+def should_score_converted_capture(snapshot: Path) -> bool:
+    data = load_snapshot(snapshot)
+    return isinstance(data.get("visibleStateV1"), dict) or isinstance(data.get("domSnapshot"), dict)
+
+
+def write_score_input(snapshot: Path, tmp_dir: Path) -> Path:
+    if not should_score_converted_capture(snapshot):
+        return snapshot
+    converted = convert_capture(snapshot)
+    output = tmp_dir / f"{snapshot.stem}-visible-state-score-input.json"
+    output.write_text(json.dumps(converted, indent=2) + "\n", encoding="utf-8")
+    return output
 
 
 def selected_gamedatas(data: dict[str, Any]) -> dict[str, Any]:
@@ -203,7 +223,9 @@ def main() -> None:
         expected.extend(load_bga_result_expected(args.snapshot))
     if not expected:
         raise SystemExit("no expected scores provided or found in selected snapshot fields")
-    report = run_score(args.snapshot, args.perspective, args.catalog)
+    with tempfile.TemporaryDirectory(prefix="harmonies_score_qa_") as tmp:
+        score_input = write_score_input(args.snapshot, Path(tmp))
+        report = run_score(score_input, args.perspective, args.catalog)
     comparison = compare_scores(report, expected)
     comparison["warnings"] = capture_warnings(args.snapshot, args.use_bga_result)
     output = json.dumps(comparison, indent=2)

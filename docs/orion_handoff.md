@@ -112,6 +112,8 @@ Next safe work before tuning:
 
 - Reload extension and ScriptCat with latest files when user returns; new capture version should report `domCards=true`.
 - `tools/summarize_capture_visible_state.py <captures...>` prints compact active-player/card/river/central summaries for quick QA.
+- `tools.score_qa` now auto-converts capture JSON through DOM/visible-state normalizer before scoring, avoiding false failures from stale raw `gamedatas`.
+- Match 14 post-game capture `1780661303535` scorer parity passes via `python -m tools.score_qa ... --use-capture-scores` (`90`, `102`).
 - Extension now refuses manual Analyze in `gameEnd` state (`Game ended; advisor disabled`).
 - Split oversized `tools/bga_harmonies_capture.user.js` and `tools/dom_capture_to_snapshot.py` when practical; both exceed preferred 300-400 lines.
 - Add a JS fixture/unit test for normalizer card fallback guard if local test harness exists or can be small.
