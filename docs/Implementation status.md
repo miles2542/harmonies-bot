@@ -75,8 +75,9 @@
   during page scrolling.
 - Plan sections now mark the highest-utility plan seen so far with a `Best so far` badge. At a fixed
   user cutoff, follow that badge unless choosing a simpler plan intentionally.
-- Settlement steps now draw a low-opacity card-to-cell arrow from `#card_<typeArg>` to the target cell,
-  plus a subtle card ring, so the user can see which card cube to settle without DevTools.
+- Settlement steps now draw a low-opacity card-to-cell arrow from the BGA per-game card DOM id
+  (`#card_<cardId>`) to the target cell, plus a subtle card ring, so the user can see which card cube
+  to settle without DevTools. Labels still show persistent card `typeArg`.
 - Nature Spirit choice parsing is now gated by active-player `gamestate.args.canChooseSpirit` plus
   `actChooseSpirit`/`chooseSpirit`, avoiding stale `chooseSpirit` plans after the first-turn window.
 - Group inspector labels now use a separate fixed overlay layer and stricter visible-DOM token reads,
@@ -93,6 +94,12 @@
   arrays, ignore stale no-cube Spirit offers after the choice window, and card arrows find DOM cards by
   BGA per-game `cardId` while labels still show persistent `typeArg`. Regression tests and
   `tools.validate_advisor_plan_legality` cover unavailable/completed/undrafted/over-count settlements.
+- Capture helper is now `v0.3.4`: payload includes `scriptVersion`, Download shows a persistent `Save`
+  fallback link, and Copy/Download status updates before heavy JSON building starts.
+- Extension visible-card reliability now requires at least one visible card DOM node. Empty hand
+  containers alone no longer cause DOM card override to wipe fallback card state.
+- `tools.validate_advisor_plan_legality --capture <captures...> --time-budget-ms 10000 --max-results 10`
+  batch-validates capture files, skips `gameEnd` captures, and stresses wider result sets.
 - Match 14 active-turn captures are now durable anonymized advisor request fixtures:
   `sidea_2p_nature_match14_full_hand_request.json` and
   `sidea_2p_nature_match14_after_completion_near_end_request.json`. They cover full-hand

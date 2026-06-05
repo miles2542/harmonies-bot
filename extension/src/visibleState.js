@@ -23,6 +23,7 @@
     const centralTokenGroups = readDomCentralTokenGroups(gamedatas);
     const playerContainers = players.flatMap((player) => [player.handRect, player.doneRect]).filter(Boolean);
     const riverCards = readRiverCards(playerContainers, cardPointCounts);
+    const domCardNodesSeen = allCardNodes().length > 0;
     const spiritChoicesByPlayerId = readSpiritChoicesByPlayerId(gamedatas, perspectivePlayerId, playerContainers, cardPointCounts);
     const notes = [];
     if (players.some((player) => !player.handRect)) {
@@ -42,7 +43,7 @@
       riverCards,
       spiritChoicesByPlayerId,
       reliability: {
-        domCards: players.some((player) => player.handRect) || riverCards.length > 0,
+        domCards: domCardNodesSeen,
         domBoards: players.some((player) => player.cells.length > 0),
         domCentral: centralTokenGroups.length === 5 && centralTokenGroups.every((group) => group.length === 3),
         notes,

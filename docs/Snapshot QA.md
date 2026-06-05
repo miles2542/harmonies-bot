@@ -22,6 +22,8 @@ python -m tools.build_advisor_request_fixture temp\snapshots\capture.json `
   fixtures\advisor_requests\case_request.json
 python -m tools.check_advisor_request_fixtures
 python -m tools.validate_advisor_plan_legality
+python -m tools.validate_advisor_plan_legality --capture temp\snapshots\capture-a.json `
+  temp\snapshots\capture-b.json --time-budget-ms 10000 --max-results 10
 python -m tools.benchmark_cli --threads 12 --time-budget-ms 30000
 python -m tools.benchmark_cli fixtures\advisor_requests\case_request.json --threads 12 `
   --time-budget-ms 30000 --future-beam 10 --future-branch 5 `
@@ -46,7 +48,8 @@ Default output is human-readable. `--json` output is intended for fixture logs a
 
 - Capture exact `window.gameui.gamedatas` after BGA UI finishes updating.
 - Optional helper: install `tools\bga_harmonies_capture.user.js` in ScriptCat/Tampermonkey and
-  click `Download`. Current panel should show `v0.3.3`; stale panels are replaced automatically.
+  click `Download`. Current panel should show `v0.3.4`; stale panels are replaced automatically.
+  If browser blocks auto-download, click the visible `Save` fallback link.
 - Record table context separately: date, player count, board side, turn phase, active player,
   notable action just completed.
 - Anonymize before sharing or committing fixture data:

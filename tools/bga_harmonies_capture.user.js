@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Harmonies BGA Snapshot Capture
 // @namespace    harmonies-bga-advisor-local
-// @version      0.3.3
+// @version      0.3.4
 // @description  Read-only Harmonies snapshot capture helper for scorer validation.
 // @match        https://boardgamearena.com/*
 // @match        https://*.boardgamearena.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function harmoniesCaptureUserScript() {
-  const SCRIPT_VERSION = "0.3.3";
+  const SCRIPT_VERSION = "0.3.4";
   const ROOT_ID = "harmonies-capture-panel";
   const STORAGE_KEY = "harmonies-bga-capture-latest-v2";
   const DOM_KEY_RE = /(harm|board|cell|hex|token|cube|card|animal|player|score|result)/i;
@@ -41,6 +41,7 @@
     const domSnapshot = readDomSnapshot();
     return {
       kind: "harmonies-bga-capture-v2",
+      scriptVersion: SCRIPT_VERSION,
       capturedAt: new Date().toISOString(),
       url: window.location.href,
       title: document.title,
@@ -451,7 +452,7 @@
     const root = document.createElement("section");
     root.id = ROOT_ID;
     root.dataset.version = SCRIPT_VERSION;
-    root.innerHTML = `<strong>Harmonies Capture</strong><button type="button" data-action="copy">Copy</button><button type="button" data-action="download">Download</button><span data-role="status">v${SCRIPT_VERSION}</span>`;
+    root.innerHTML = `<strong>Harmonies Capture</strong><button type="button" data-action="copy">Copy</button><button type="button" data-action="download">Download</button><a data-role="download-link" style="display:none;color:#fff;text-decoration:underline" download>Save</a><span data-role="status">v${SCRIPT_VERSION}</span>`;
     root.style.cssText = ["position:fixed", "right:12px", "bottom:12px", "z-index:99999", "display:flex", "gap:6px", "align-items:center", "padding:8px", "background:#111", "color:#fff", "font:12px sans-serif", "border:1px solid #555"].join(";");
     document.documentElement.appendChild(root);
     root.querySelector("[data-action='copy']").addEventListener("click", () => copyPayload(root));
@@ -468,31 +469,34 @@
 
   function downloadPayload(root) {
     runCaptureAction(root, "download", () => {
-      const blob = new Blob([JSON.stringify(readPayload(), null, 2)], { type: "application/json" });
-      const link = document.createElement("a");
+      const text = JSON.stringify(readPayload(), null, 2);
+      const blob = new Blob([text], { type: "application/json" });
+      const filename = `harmonies-gamedatas-${Date.now()}.json`;
+      const link = downloadLink(root);
+      if (link.href) URL.revokeObjectURL(link.href);
       link.href = URL.createObjectURL(blob);
-      link.download = `harmonies-gamedatas-${Date.now()}.json`;
-      link.style.display = "none";
-      document.body.appendChild(link);
+      link.download = filename;
+      link.style.display = "inline";
+      link.textContent = "Save";
       link.click();
       setTimeout(() => {
-        URL.revokeObjectURL(link.href);
-        link.remove();
+        setStatus(root, `download ready ${formatBytes(blob.size)}`);
       }, 250);
-      setStatus(root, `downloaded ${formatBytes(blob.size)}`);
     });
   }
 
   function runCaptureAction(root, label, action) {
     setBusy(root, true);
     setStatus(root, `${label}: building...`);
-    try {
-      action();
-    } catch (error) {
-      fail(root, error);
-    } finally {
-      setBusy(root, false);
-    }
+    window.setTimeout(() => {
+      try {
+        action();
+      } catch (error) {
+        fail(root, error);
+      } finally {
+        setBusy(root, false);
+      }
+    }, 25);
   }
 
   function copyText(text) {
@@ -522,6 +526,10 @@
 
   function setStatus(root, message) {
     root.querySelector("[data-role='status']").textContent = message;
+  }
+
+  function downloadLink(root) {
+    return root.querySelector("[data-role='download-link']");
   }
 
   function setBusy(root, busy) {

@@ -136,13 +136,18 @@ Verified captures:
 
 Next safe work before tuning:
 
-- Reload extension and ScriptCat with latest files when user returns; new capture panel should show `v0.3.3` and new captures should report `domCards=true`.
+- Reload extension and ScriptCat with latest files when user returns; new capture panel should show `v0.3.4`.
+  If auto-download is blocked, click the visible `Save` fallback link. New captures include `scriptVersion`.
+- Extension visible-card reliability now requires at least one visible card DOM node. Empty hand
+  containers alone no longer cause DOM card override to wipe fallback card state.
+- `tools.validate_advisor_plan_legality --capture <captures...> --time-budget-ms 10000 --max-results 10`
+  batch-validates capture files and skips `gameEnd` captures.
 - `tools/summarize_capture_visible_state.py <captures...>` prints compact active-player/card/river/central summaries for quick QA.
 - `tools.score_qa` now auto-converts capture JSON through DOM/visible-state normalizer before scoring, avoiding false failures from stale raw `gamedatas`.
 - Match 14 post-game capture `1780661303535` scorer parity passes via `python -m tools.score_qa ... --use-capture-scores` (`90`, `102`).
 - Extension now refuses manual Analyze in `gameEnd` state (`Game ended; advisor disabled`).
 - Split oversized `tools/bga_harmonies_capture.user.js` and `tools/dom_capture_to_snapshot.py` when practical; both exceed preferred 300-400 lines.
-- Do not start weight tuning until one live/spectate UI test confirms arrows and panel cards match visible active hand with capture `0.3.3`.
+- Do not start weight tuning until one live/spectate UI test confirms arrows and panel cards match visible active hand with capture `0.3.4`.
 - Before weight tuning, run a small parameter sweep on Match 14 full-hand and near-end fixtures.
   Depth 2 is currently too expensive to complete within 100s on the full-hand case, so tune branch
   widths/refill samples before raising max depth.

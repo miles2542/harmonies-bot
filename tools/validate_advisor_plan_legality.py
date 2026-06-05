@@ -66,14 +66,23 @@ def load_card_catalog(path: Path = CARD_CATALOG_PATH) -> dict[int, dict[str, Any
     return {int(card["type_arg"]): card for card in raw.values()}
 
 
-def request_from_capture(path: Path) -> dict[str, Any]:
+def request_from_capture(path: Path, time_budget_ms: int, max_results: int) -> dict[str, Any]:
     return {
         "snapshot": convert_dom_capture(path),
-        "timeBudgetMs": 1500,
-        "maxResults": 3,
+        "timeBudgetMs": time_budget_ms,
+        "maxResults": max_results,
         "seed": 1,
         "runtimeMode": "capture-legality",
     }
+
+
+def capture_state_name(path: Path) -> str:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    context = data.get("context")
+    if isinstance(context, dict):
+        state = context.get("gameStateName")
+        return state if isinstance(state, str) else ""
+    return ""
 
 
 def write_temp_request(tmp_dir: Path, capture_path: Path, request: dict[str, Any]) -> Path:
@@ -351,19 +360,36 @@ def main() -> int:
         description="Validate advisor output uses only legally available cards."
     )
     parser.add_argument("requests", nargs="*", type=Path)
-    parser.add_argument("--capture", action="append", type=Path, default=[])
+    parser.add_argument("--capture", action="append", nargs="+", type=Path, default=[])
+    parser.add_argument("--time-budget-ms", type=int, default=1500)
+    parser.add_argument("--max-results", type=int, default=3)
     args = parser.parse_args()
 
     report: list[dict[str, Any]] = []
     ok = True
-    request_paths = args.requests or ([] if args.capture else DEFAULT_REQUESTS)
+    capture_paths = [path for group in args.capture for path in group]
+    request_paths = args.requests or ([] if capture_paths else DEFAULT_REQUESTS)
     with tempfile.TemporaryDirectory(prefix="harmonies_capture_requests_") as tmp:
         tmp_dir = Path(tmp)
         cases: list[tuple[str, Path, dict[str, Any]]] = []
         for request_path in request_paths:
             cases.append((str(request_path), request_path, load_request(request_path)))
-        for capture_path in args.capture:
-            request = request_from_capture(capture_path)
+        for capture_path in capture_paths:
+            if capture_state_name(capture_path).lower() == "gameend":
+                report.append(
+                    {
+                        "request": str(capture_path),
+                        "status": "skippedGameEnd",
+                        "bestMoves": 0,
+                        "issues": [],
+                    }
+                )
+                continue
+            request = request_from_capture(
+                capture_path,
+                time_budget_ms=args.time_budget_ms,
+                max_results=args.max_results,
+            )
             cases.append(
                 (
                     str(capture_path),
