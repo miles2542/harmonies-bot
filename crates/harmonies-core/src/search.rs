@@ -247,7 +247,7 @@ fn estimate_depth(
                 snapshot.board_side,
                 catalog,
                 seed.wrapping_add(index as u64),
-                depth.saturating_sub(1),
+                depth,
                 deadline,
                 should_cancel,
                 &mut local_progress,

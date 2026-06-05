@@ -23,6 +23,14 @@ COLOR_BY_CLASS = {
     "6": "building",
     "7": "building",
 }
+OFFICIAL_TOKEN_COUNTS = {
+    "water": 23,
+    "mountain": 23,
+    "trunk": 21,
+    "foliage": 19,
+    "field": 19,
+    "building": 15,
+}
 CARD_CATALOG_PATH = Path("docs/cards_database.json")
 
 
@@ -340,10 +348,36 @@ def empty_hexes(cells: list[dict[str, object]]) -> int:
     return sum(1 for cell in cells if not as_object(cell.get("stack")).get("tokens"))
 
 
-def zero_bag_counts() -> dict[str, int]:
-    return dict.fromkeys(
-        ["water", "mountain", "trunk", "foliage", "field", "building", "unknown"], 0
-    )
+def infer_bag_counts(
+    capture: dict[str, object],
+    players: list[dict[str, object]],
+    central_token_groups: list[list[str]],
+) -> dict[str, int]:
+    counts = dict(OFFICIAL_TOKEN_COUNTS)
+    for color in visible_token_colors(players, central_token_groups):
+        if color in counts:
+            counts[color] = max(0, counts[color] - 1)
+    known_total = sum(counts.values())
+    reported_total = number_value(as_object(capture.get("gamedatas")).get("remainingTokens"))
+    counts["unknown"] = max(0, reported_total - known_total) if reported_total else 0
+    return counts
+
+
+def visible_token_colors(
+    players: list[dict[str, object]],
+    central_token_groups: list[list[str]],
+) -> list[str]:
+    colors: list[str] = []
+    for player in players:
+        for cell in as_list(player.get("cells")):
+            colors.extend(
+                string_value(token)
+                for token in as_list(as_object(as_object(cell).get("stack")).get("tokens"))
+                if string_value(token)
+            )
+    for group in central_token_groups:
+        colors.extend(group)
+    return colors
 
 
 def visible_card(card: object) -> dict[str, object] | None:
@@ -492,17 +526,18 @@ def convert_visible_state(capture: dict[str, object]) -> dict[str, object] | Non
         })
     if not players:
         raise SystemExit("visibleStateV1 has no players")
+    central_token_groups = visible_central_groups(visible.get("centralTokenGroups"))
     return {
         "schemaVersion": 1,
         "perspectivePlayerId": perspective_player_id(visible, players),
         "activePlayerId": string_value(visible.get("activePlayerId")),
         "boardSide": board_side_from_capture(capture),
         "players": players,
-        "centralTokenGroups": visible_central_groups(visible.get("centralTokenGroups")),
+        "centralTokenGroups": central_token_groups,
         "riverCards": visible_cards(visible.get("riverCards"))
         if use_visible_cards
         else as_list(as_object(fallback_snapshot).get("riverCards")),
-        "bagCounts": zero_bag_counts(),
+        "bagCounts": infer_bag_counts(capture, players, central_token_groups),
         "cardsCatalogVersion": "visible-state-v1",
     }
 
@@ -549,15 +584,16 @@ def convert_dom_snapshot(data: dict[str, Any]) -> dict[str, object]:
     if not players:
         raise SystemExit("no player-table DOM nodes found")
     active_player_id = active_player_id_from_capture(data, ids)
+    central_token_groups = central_groups(nodes)
     return {
         "schemaVersion": 1,
         "perspectivePlayerId": active_player_id,
         "activePlayerId": active_player_id,
         "boardSide": board_side(nodes),
         "players": players,
-        "centralTokenGroups": central_groups(nodes),
+        "centralTokenGroups": central_token_groups,
         "riverCards": river_cards(nodes, card_point_counts, catalog_cube_counts),
-        "bagCounts": zero_bag_counts(),
+        "bagCounts": infer_bag_counts(data, players, central_token_groups),
         "cardsCatalogVersion": "dom-capture",
     }
 

@@ -119,6 +119,16 @@
   Root and future-frontier parallelism exist, but search fan-out is likely still too narrow after
   pruning. Next work should benchmark node counts/frontier sizes and tune branch/refill/depth knobs
   before assuming a threading bug.
+- Offline benchmark tooling now supports fixture corpus runs, `RAYON_NUM_THREADS`, time-budget
+  override, wall/engine timing, node counts, depth, and top-group stability:
+  `python -m tools.benchmark_cli --threads 12 --time-budget-ms 30000`.
+- Search depth labels now count actual future turns. Earlier `depth 1` was zero future turns because
+  `future_value` received `depth - 1`.
+- DOM/capture conversion now infers `bagCounts` from visible board/central tokens plus BGA
+  `remainingTokens`; old DOM fixtures had zero bag counts, making future refill expansion impossible.
+- Match 14 full-hand benchmark after bag-count/depth fixes:
+  - 30s budget: ~17.7s engine, 48,120 nodes, depth 1 complete, future estimate 104.
+  - 100s budget: ~89.9s engine, 1,071,337 nodes, depth 1 complete, depth 2 partial, future estimate 115.
 
 ## Next Phases
 

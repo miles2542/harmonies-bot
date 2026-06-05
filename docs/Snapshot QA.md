@@ -21,6 +21,7 @@ python -m tools.summarize_capture_visible_state temp\snapshots\capture.json
 python -m tools.build_advisor_request_fixture temp\snapshots\capture.json `
   fixtures\advisor_requests\case_request.json
 python -m tools.validate_advisor_plan_legality
+python -m tools.benchmark_cli --threads 12 --time-budget-ms 30000
 ```
 
 Default output is human-readable. `--json` output is intended for fixture logs and `jq`.
@@ -53,6 +54,9 @@ python tools\snapshot_anonymizer.py snapshots\raw\turn.json snapshots\raw\turn.a
 - Run snapshot QA against raw/anonymized input and normalized output.
 - For advisor legality fixtures, prefer `tools.build_advisor_request_fixture` over manual JSON edits.
   It converts visible DOM captures when present and anonymizes player ids in `GameSnapshotV1`.
+- DOM/capture conversion infers bag counts from visible board/central tokens and
+  `gamedatas.remainingTokens`. Check `bagCounts` is non-zero before using a fixture for future-search
+  benchmarks.
 - Run `tools.validate_advisor_plan_legality` after adding active-turn request fixtures. It replays
   group selection, token placement, card draft, settlement source, remaining cubes, locked cells,
   and catalog pattern validity.

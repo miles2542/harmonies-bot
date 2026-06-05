@@ -99,7 +99,9 @@ Live spectate QA on snapshot temp\\snapshots\\harmonies-gamedatas-1780652789428.
 - `gamedatas` remains fallback only; normalizer does not let `domBoards=true/domCards=false` empty card arrays override card state.
 - Capture userscript version `0.3.3` fixes a regression where BGA `.harmonies-card` elements were filtered out as capture UI and hardens Copy/Download button feedback.
 - Capture converter uses `visibleStateV1` when reliable and falls back to raw `domSnapshot` card extraction if `visibleStateV1.reliability.domCards=false`.
+- Capture converter now infers `bagCounts` from visible board/central tokens and `gamedatas.remainingTokens`; older DOM conversion zeroed bag counts and disabled future refill expansion in offline benchmarks.
 - Validator now replays group selection, token placement, draft, settlement source, remaining cubes, locked cells, and catalog pattern validity.
+- Search depth labels now count actual future turns. Previous code reported `depth 1` while expanding zero future turns (`depth - 1`).
 
 Verified captures:
 
@@ -112,6 +114,11 @@ Verified captures:
   - `fixtures/advisor_requests/sidea_2p_nature_match14_after_completion_near_end_request.json`.
 - `python -m tools.validate_advisor_plan_legality` now includes match 12 and match 14 request fixtures and passes.
 - `tools.build_advisor_request_fixture` builds anonymized `AdvisorRequestV1` fixtures from capture JSON or normalized snapshots.
+- `tools.benchmark_cli` now benchmarks one or more advisor request fixtures with optional `--threads`
+  and `--time-budget-ms`, reporting wall/engine ms, nodes, completed depth, top group stability.
+- Match 14 full-hand benchmark with 12 Rayon threads:
+  - 30s budget: ~17.7s, 48,120 nodes, depth 1 complete, future estimate 104.
+  - 100s budget: ~89.9s, 1,071,337 nodes, depth 1 complete, depth 2 partial, future estimate 115.
 
 Next safe work before tuning:
 
@@ -122,3 +129,6 @@ Next safe work before tuning:
 - Extension now refuses manual Analyze in `gameEnd` state (`Game ended; advisor disabled`).
 - Split oversized `tools/bga_harmonies_capture.user.js` and `tools/dom_capture_to_snapshot.py` when practical; both exceed preferred 300-400 lines.
 - Do not start weight tuning until one live/spectate UI test confirms arrows and panel cards match visible active hand with capture `0.3.3`.
+- Before weight tuning, run a small parameter sweep on Match 14 full-hand and near-end fixtures.
+  Depth 2 is currently too expensive to complete within 100s on the full-hand case, so tune branch
+  widths/refill samples before raising max depth.

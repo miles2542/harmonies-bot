@@ -722,13 +722,13 @@
       }
     ],
     "bagCounts": {
-      "water": 0,
-      "mountain": 0,
-      "trunk": 0,
-      "foliage": 0,
-      "field": 0,
-      "building": 0,
-      "unknown": 0
+      "water": 11,
+      "mountain": 12,
+      "trunk": 11,
+      "foliage": 13,
+      "field": 10,
+      "building": 6,
+      "unknown": 3
     },
     "cardsCatalogVersion": "visible-state-v1"
   },
