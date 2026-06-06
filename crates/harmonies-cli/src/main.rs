@@ -107,9 +107,9 @@ fn score_command(args: Vec<String>) -> anyhow::Result<()> {
 
 fn self_play_command(args: Vec<String>) -> anyhow::Result<()> {
     let path = args.first().map(PathBuf::from).context(
-        "usage: harmonies-cli self-play <snapshot.json> [--catalog PATH] [--weights PATH]",
+        "usage: harmonies-cli self-play <snapshot.json> [--catalog PATH] [--weights PATH] [--opponent-weights PATH]",
     )?;
-    let options = SelfPlayCommandOptions::parse(&args[1..])?;
+    let mut options = SelfPlayCommandOptions::parse(&args[1..])?;
     let input =
         fs::read_to_string(&path).with_context(|| format!("failed to read {}", path.display()))?;
     let raw: Value = serde_json::from_str(&input).context("failed to parse snapshot JSON")?;
@@ -121,6 +121,11 @@ fn self_play_command(args: Vec<String>) -> anyhow::Result<()> {
         .map(load_weights)
         .transpose()?
         .unwrap_or_default();
+    options.config.opponent_weights = options
+        .opponent_weights_path
+        .as_ref()
+        .map(load_weights)
+        .transpose()?;
     let report = run_self_play(snapshot, &catalog, &weights, &options.config);
     println!("{}", serde_json::to_string_pretty(&report)?);
     Ok(())
@@ -137,6 +142,7 @@ struct SelfPlayCommandOptions {
     perspective: Option<String>,
     catalog_path: PathBuf,
     weights_path: Option<PathBuf>,
+    opponent_weights_path: Option<PathBuf>,
     config: SelfPlayConfig,
 }
 
@@ -145,6 +151,7 @@ impl SelfPlayCommandOptions {
         let mut perspective = None;
         let mut catalog_path = PathBuf::from("docs/cards_database.json");
         let mut weights_path = None;
+        let mut opponent_weights_path = None;
         let mut config = SelfPlayConfig::default();
         let mut index = 0;
         while index < args.len() {
@@ -172,6 +179,14 @@ impl SelfPlayCommandOptions {
                     );
                     index += 2;
                 }
+                "--opponent-weights" => {
+                    opponent_weights_path = Some(
+                        args.get(index + 1)
+                            .map(PathBuf::from)
+                            .context("--opponent-weights requires a path")?,
+                    );
+                    index += 2;
+                }
                 "--turn-budget-ms" => {
                     config.turn_budget_ms = parse_number(args, index, "--turn-budget-ms")?;
                     index += 2;
@@ -195,6 +210,7 @@ impl SelfPlayCommandOptions {
             perspective,
             catalog_path,
             weights_path,
+            opponent_weights_path,
             config,
         })
     }

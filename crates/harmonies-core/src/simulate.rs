@@ -23,6 +23,8 @@ pub struct SelfPlayConfig {
     pub seed: u64,
     pub runtime_mode: String,
     pub scorer_validated: bool,
+    #[serde(default)]
+    pub opponent_weights: Option<EvalWeights>,
 }
 
 impl Default for SelfPlayConfig {
@@ -34,6 +36,7 @@ impl Default for SelfPlayConfig {
             seed: 1,
             runtime_mode: "self-play".into(),
             scorer_validated: false,
+            opponent_weights: None,
         }
     }
 }
@@ -101,6 +104,13 @@ pub fn run_self_play(
             catalog,
         )
         .total();
+        
+        let player_weights = if active_index == 0 {
+            weights.clone()
+        } else {
+            config.opponent_weights.clone().unwrap_or_else(|| weights.clone())
+        };
+
         let response = advise(AdvisorRequestV1 {
             snapshot: snapshot.clone(),
             time_budget_ms: config.turn_budget_ms,
@@ -108,7 +118,7 @@ pub fn run_self_play(
             seed: config.seed.wrapping_add(turn_index as u64),
             runtime_mode: config.runtime_mode.clone(),
             catalog: catalog.clone(),
-            weights: weights.clone(),
+            weights: player_weights,
         });
         let plan = response.best_moves.first().cloned();
         if plan.is_none() {
