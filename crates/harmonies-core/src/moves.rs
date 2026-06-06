@@ -47,9 +47,58 @@ pub fn generate_placement_sequences(
     let mut remaining = tokens.to_vec();
     remaining.sort_by_key(color_sort_key);
     let mut steps = Vec::new();
-    generate_placement_sequences_inner(player.clone(), &remaining, &mut steps, &mut results);
+    let mut player_mut = player.clone();
+    generate_placement_sequences_backtracking(&mut player_mut, &mut remaining, &mut steps, &mut results);
     dedupe_sequences(results)
 }
+
+fn generate_placement_sequences_backtracking(
+    player: &mut PlayerState,
+    remaining: &mut Vec<Color>,
+    steps: &mut Vec<PlacementStep>,
+    results: &mut Vec<PlacementSequence>,
+) {
+    if remaining.is_empty() {
+        results.push(PlacementSequence {
+            steps: steps.clone(),
+            player: player.clone(),
+        });
+        return;
+    }
+
+    for token_index in 0..remaining.len() {
+        if token_index > 0 && remaining[token_index] == remaining[token_index - 1] {
+            continue;
+        }
+
+        let token = remaining.remove(token_index);
+
+        for cell_index in 0..player.cells.len() {
+            let was_empty = player.cells[cell_index].stack.is_empty();
+            if place_token(&mut player.cells[cell_index], token).is_err() {
+                continue;
+            }
+            let old_empty_hexes = player.empty_hexes;
+            if was_empty {
+                player.empty_hexes = player.empty_hexes.saturating_sub(1);
+            }
+            steps.push(PlacementStep {
+                token,
+                coord: player.cells[cell_index].coord,
+            });
+
+            generate_placement_sequences_backtracking(player, remaining, steps, results);
+
+            steps.pop();
+            player.empty_hexes = old_empty_hexes;
+            player.cells[cell_index].stack.pop();
+        }
+
+        remaining.insert(token_index, token);
+    }
+}
+
+
 
 pub fn legal_settlements(player: &PlayerState, catalog: &CardCatalog) -> Vec<SettlementMove> {
     let cells_by_coord: HashMap<Coord, &Cell> =
@@ -118,6 +167,55 @@ pub fn apply_settlement(player: &mut PlayerState, settlement: &SettlementMove) -
     true
 }
 
+fn apply_settlement_track(
+    player: &mut PlayerState,
+    settlement: &SettlementMove,
+) -> Option<(usize, bool)> {
+    let card_index = player
+        .active_cards
+        .iter()
+        .position(|card| card.card_id == settlement.card_id && card.remaining_cubes > 0)?;
+    let cell_index = player
+        .cells
+        .iter()
+        .position(|cell| cell.coord == settlement.cube_coord && !cell.locked_by_cube)?;
+
+    player.cells[cell_index].locked_by_cube = true;
+    player.active_cards[card_index].remaining_cubes -= 1;
+    let was_completed = player.active_cards[card_index].remaining_cubes == 0;
+    if was_completed {
+        let completed = player.active_cards.remove(card_index);
+        player.completed_cards.push(completed);
+    }
+    Some((card_index, was_completed))
+}
+
+fn rollback_settlement_track(
+    player: &mut PlayerState,
+    settlement: &SettlementMove,
+    card_index: usize,
+    was_completed: bool,
+) {
+    if let Some(cell) = player
+        .cells
+        .iter_mut()
+        .find(|cell| cell.coord == settlement.cube_coord)
+    {
+        cell.locked_by_cube = false;
+    }
+
+    if was_completed {
+        if let Some(mut card) = player.completed_cards.pop() {
+            card.remaining_cubes += 1;
+            player.active_cards.insert(card_index, card);
+        }
+    } else {
+        if card_index < player.active_cards.len() {
+            player.active_cards[card_index].remaining_cubes += 1;
+        }
+    }
+}
+
 pub fn apply_all_forced_settlements(
     player: &mut PlayerState,
     catalog: &CardCatalog,
@@ -144,71 +242,33 @@ pub fn generate_settlement_sequences(
         player: player.clone(),
     }];
     let mut path = Vec::new();
-    generate_settlement_sequences_inner(player.clone(), catalog, &mut path, &mut results);
+    let mut player_mut = player.clone();
+    generate_settlement_sequences_backtracking(&mut player_mut, catalog, &mut path, &mut results);
     dedupe_settlement_sequences(results)
 }
 
-fn generate_settlement_sequences_inner(
-    player: PlayerState,
+fn generate_settlement_sequences_backtracking(
+    player: &mut PlayerState,
     catalog: &CardCatalog,
     path: &mut Vec<SettlementMove>,
     results: &mut Vec<SettlementSequence>,
 ) {
-    for settlement in legal_settlements(&player, catalog) {
-        let mut next_player = player.clone();
-        if !apply_settlement(&mut next_player, &settlement) {
+    for settlement in legal_settlements(player, catalog) {
+        let Some((card_index, was_completed)) = apply_settlement_track(player, &settlement) else {
             continue;
-        }
-        path.push(settlement);
+        };
+        path.push(settlement.clone());
         results.push(SettlementSequence {
             settlements: path.clone(),
-            player: next_player.clone(),
+            player: player.clone(),
         });
-        generate_settlement_sequences_inner(next_player, catalog, path, results);
+        generate_settlement_sequences_backtracking(player, catalog, path, results);
         path.pop();
+        rollback_settlement_track(player, &settlement, card_index, was_completed);
     }
 }
 
-fn generate_placement_sequences_inner(
-    player: PlayerState,
-    remaining: &[Color],
-    steps: &mut Vec<PlacementStep>,
-    results: &mut Vec<PlacementSequence>,
-) {
-    if remaining.is_empty() {
-        results.push(PlacementSequence {
-            steps: steps.clone(),
-            player,
-        });
-        return;
-    }
 
-    let mut used_colors = HashSet::new();
-    for (token_index, token) in remaining.iter().copied().enumerate() {
-        if !used_colors.insert(token) {
-            continue;
-        }
-
-        for cell_index in 0..player.cells.len() {
-            let mut next_player = player.clone();
-            let was_empty = next_player.cells[cell_index].stack.is_empty();
-            if place_token(&mut next_player.cells[cell_index], token).is_err() {
-                continue;
-            }
-            if was_empty {
-                next_player.empty_hexes = next_player.empty_hexes.saturating_sub(1);
-            }
-            steps.push(PlacementStep {
-                token,
-                coord: next_player.cells[cell_index].coord,
-            });
-            let mut next_remaining = remaining.to_vec();
-            next_remaining.remove(token_index);
-            generate_placement_sequences_inner(next_player, &next_remaining, steps, results);
-            steps.pop();
-        }
-    }
-}
 
 fn dedupe_sequences(sequences: Vec<PlacementSequence>) -> Vec<PlacementSequence> {
     let mut seen = HashSet::new();
@@ -456,5 +516,172 @@ mod tests {
             .find(|s| s.steps[0].coord == Coord { col: 1, row: 0 })
             .unwrap();
         assert_eq!(seq_non_empty.player.empty_hexes, 1);
+    }
+
+    fn generate_placement_sequences_cloning(
+        player: &PlayerState,
+        tokens: &[Color],
+    ) -> Vec<PlacementSequence> {
+        let mut results = Vec::new();
+        let mut remaining = tokens.to_vec();
+        remaining.sort_by_key(color_sort_key);
+        let mut steps = Vec::new();
+        generate_placement_sequences_inner_cloning(player.clone(), &remaining, &mut steps, &mut results);
+        dedupe_sequences(results)
+    }
+
+    fn generate_placement_sequences_inner_cloning(
+        player: PlayerState,
+        remaining: &[Color],
+        steps: &mut Vec<PlacementStep>,
+        results: &mut Vec<PlacementSequence>,
+    ) {
+        if remaining.is_empty() {
+            results.push(PlacementSequence {
+                steps: steps.clone(),
+                player,
+            });
+            return;
+        }
+
+        let mut used_colors = HashSet::new();
+        for (token_index, token) in remaining.iter().copied().enumerate() {
+            if !used_colors.insert(token) {
+                continue;
+            }
+
+            for cell_index in 0..player.cells.len() {
+                let mut next_player = player.clone();
+                let was_empty = next_player.cells[cell_index].stack.is_empty();
+                if place_token(&mut next_player.cells[cell_index], token).is_err() {
+                    continue;
+                }
+                if was_empty {
+                    next_player.empty_hexes = next_player.empty_hexes.saturating_sub(1);
+                }
+                steps.push(PlacementStep {
+                    token,
+                    coord: next_player.cells[cell_index].coord,
+                });
+                let mut next_remaining = remaining.to_vec();
+                next_remaining.remove(token_index);
+                generate_placement_sequences_inner_cloning(next_player, &next_remaining, steps, results);
+                steps.pop();
+            }
+        }
+    }
+
+    fn generate_settlement_sequences_cloning(
+        player: &PlayerState,
+        catalog: &CardCatalog,
+    ) -> Vec<SettlementSequence> {
+        let mut results = vec![SettlementSequence {
+            settlements: Vec::new(),
+            player: player.clone(),
+        }];
+        let mut path = Vec::new();
+        generate_settlement_sequences_inner_cloning(player.clone(), catalog, &mut path, &mut results);
+        dedupe_settlement_sequences(results)
+    }
+
+    fn generate_settlement_sequences_inner_cloning(
+        player: PlayerState,
+        catalog: &CardCatalog,
+        path: &mut Vec<SettlementMove>,
+        results: &mut Vec<SettlementSequence>,
+    ) {
+        for settlement in legal_settlements(&player, catalog) {
+            let mut next_player = player.clone();
+            if !apply_settlement(&mut next_player, &settlement) {
+                continue;
+            }
+            path.push(settlement);
+            results.push(SettlementSequence {
+                settlements: path.clone(),
+                player: next_player.clone(),
+            });
+            generate_settlement_sequences_inner_cloning(next_player, catalog, path, results);
+            path.pop();
+        }
+    }
+
+    #[test]
+    fn test_differential_backtracking() {
+        // --- 1. Placements differential test ---
+        let p_state = player(vec![
+            cell(0, 0, Vec::new(), false),
+            cell(1, 0, vec![Color::Trunk], false),
+            cell(2, 0, vec![Color::Mountain, Color::Mountain], false),
+            cell(3, 0, Vec::new(), true),
+        ]);
+        let tokens = vec![Color::Water, Color::Trunk, Color::Water];
+        
+        let mut backtracking_placements = generate_placement_sequences(&p_state, &tokens);
+        let mut cloning_placements = generate_placement_sequences_cloning(&p_state, &tokens);
+        
+        backtracking_placements.sort_by_key(|s| format!("{:?}", s));
+        cloning_placements.sort_by_key(|s| format!("{:?}", s));
+        
+        assert_eq!(backtracking_placements.len(), cloning_placements.len());
+        assert_eq!(backtracking_placements, cloning_placements);
+        
+        // --- 2. Settlements differential test ---
+        let mut catalog = CardCatalog::default();
+        // Card 1: requires Water
+        catalog.cards.insert(
+            1,
+            CardDefinition {
+                type_arg: 1,
+                point_locations: vec![5],
+                pattern: vec![CardPatternStep {
+                    colors: vec![1],
+                    position: 0,
+                    allow_cube: true,
+                }],
+                is_spirit: false,
+                spirit_scoring_logic: None,
+            },
+        );
+        // Card 2: requires Mountain
+        catalog.cards.insert(
+            2,
+            CardDefinition {
+                type_arg: 2,
+                point_locations: vec![5],
+                pattern: vec![CardPatternStep {
+                    colors: vec![2],
+                    position: 0,
+                    allow_cube: true,
+                }],
+                is_spirit: false,
+                spirit_scoring_logic: None,
+            },
+        );
+
+        let mut p_state_settle = player(vec![
+            cell(0, 0, vec![Color::Water], false),
+            cell(1, 0, vec![Color::Mountain], false),
+        ]);
+        p_state_settle.active_cards.push(ActiveCard {
+            card_id: 10,
+            type_arg: 1,
+            remaining_cubes: 1,
+            is_spirit: false,
+        });
+        p_state_settle.active_cards.push(ActiveCard {
+            card_id: 20,
+            type_arg: 2,
+            remaining_cubes: 1,
+            is_spirit: false,
+        });
+
+        let mut backtracking_settlements = generate_settlement_sequences(&p_state_settle, &catalog);
+        let mut cloning_settlements = generate_settlement_sequences_cloning(&p_state_settle, &catalog);
+
+        backtracking_settlements.sort_by_key(|s| format!("{:?}", s));
+        cloning_settlements.sort_by_key(|s| format!("{:?}", s));
+
+        assert_eq!(backtracking_settlements.len(), cloning_settlements.len());
+        assert_eq!(backtracking_settlements, cloning_settlements);
     }
 }
