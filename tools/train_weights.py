@@ -5,35 +5,75 @@ import json
 from pathlib import Path
 from typing import Any
 
-DEFAULT_DENIAL_GRID = [0, 15, 35, 50, 75]
+DEFAULT_DENIAL_GRID: list[int] = [0, 15, 35, 50, 75]
+
+REQUIRED_FIELDS: dict[str, type] = {
+    "version": str,
+    "selfScorePercent": int,
+    "opponentDenialPercent": int,
+    "selfScorePercentEarly": int,
+    "selfScorePercentLate": int,
+    "opponentDenialPercentEarly": int,
+    "opponentDenialPercentLate": int,
+    "completionProximityEarly": int,
+    "completionProximityLate": int,
+    "heightVarianceEarly": int,
+    "heightVarianceLate": int,
+    "wastedHeightPenaltyEarly": int,
+    "wastedHeightPenaltyLate": int,
+    "spiritOffsetEarly": int,
+    "spiritOffsetLate": int,
+    "spiritAbandonmentThreshold": int,
+    "denialExponent": int,
+}
+
+
+def validate_weights(data: dict[str, Any]) -> None:
+    """Validate that weights match the expected EvalWeights schema and types."""
+    for field, expected_type in REQUIRED_FIELDS.items():
+        if field not in data:
+            raise ValueError(f"Missing required weight field: {field}")
+        val = data[field]
+        if expected_type is int:
+            if isinstance(val, bool) or not isinstance(val, (int, float)):
+                raise ValueError(f"Field {field} must be integer, got {type(val).__name__}")
+            # Ensure it is equivalent to an int
+            if isinstance(val, float) and not val.is_integer():
+                raise ValueError(f"Field {field} must be integer, got float {val}")
+        else:
+            if not isinstance(val, expected_type):
+                raise ValueError(f"Field {field} must be {expected_type.__name__}, got {type(val).__name__}")
 
 
 def load_weights(path: Path) -> dict[str, Any]:
+    """Load and validate weights from a JSON file."""
     with path.open("r", encoding="utf-8") as file:
         data = json.load(file)
-    required = {"version", "selfScorePercent", "opponentDenialPercent"}
-    missing = sorted(required - set(data))
-    if missing:
-        raise ValueError(f"weights missing fields: {', '.join(missing)}")
+    validate_weights(data)
     return data
 
 
 def parse_grid(value: str) -> list[int]:
+    """Parse a comma-separated list of integers."""
     return [int(part.strip()) for part in value.split(",") if part.strip()]
 
 
 def generate_candidates(baseline: dict[str, Any], denial_grid: list[int]) -> list[dict[str, Any]]:
-    candidates = []
+    """Generate candidate weights by varying the opponentDenialPercent parameter."""
+    candidates: list[dict[str, Any]] = []
     for index, denial_percent in enumerate(denial_grid):
         candidate = dict(baseline)
         candidate["version"] = f"candidate-denial-{denial_percent:03d}"
         candidate["opponentDenialPercent"] = denial_percent
         candidate["candidateIndex"] = index
+        # Validate each generated candidate to ensure it fits the schema
+        validate_weights(candidate)
         candidates.append(candidate)
     return candidates
 
 
 def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    """Write list of dictionaries to a JSONL file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as file:
         for row in rows:
@@ -75,3 +115,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
