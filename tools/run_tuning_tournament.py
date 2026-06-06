@@ -268,103 +268,106 @@ def main() -> None:
     gamma = 0.101
     A = args.iterations * 0.1
 
-    for k in range(args.iterations):
-        # Calculate SPSA step sizes for iteration k
-        ak = args.a / ((k + 1 + A) ** alpha)
-        ck = args.c / ((k + 1) ** gamma)
+    try:
+        for k in range(args.iterations):
+            # Calculate SPSA step sizes for iteration k
+            ak = args.a / ((k + 1 + A) ** alpha)
+            ck = args.c / ((k + 1) ** gamma)
 
-        # Generate simultaneous perturbation vector Delta
-        # Each Delta[i] is +1 or -1 with equal probability
-        delta = {key: random.choice([1, -1]) for key in keys_to_tune}
+            # Generate simultaneous perturbation vector Delta
+            # Each Delta[i] is +1 or -1 with equal probability
+            delta = {key: random.choice([1, -1]) for key in keys_to_tune}
 
-        # Generate perturbed candidates theta_plus and theta_minus
-        weights_plus = dict(current_best)
-        weights_minus = dict(current_best)
-        for key, sign in delta.items():
-            min_val, max_val = PARAM_BOUNDS[key]
-            val_plus = int(round(current_best[key] + ck * sign))
-            val_minus = int(round(current_best[key] - ck * sign))
-            weights_plus[key] = clamp(val_plus, min_val, max_val)
-            weights_minus[key] = clamp(val_minus, min_val, max_val)
+            # Generate perturbed candidates theta_plus and theta_minus
+            weights_plus = dict(current_best)
+            weights_minus = dict(current_best)
+            for key, sign in delta.items():
+                min_val, max_val = PARAM_BOUNDS[key]
+                val_plus = int(round(current_best[key] + ck * sign))
+                val_minus = int(round(current_best[key] - ck * sign))
+                weights_plus[key] = clamp(val_plus, min_val, max_val)
+                weights_minus[key] = clamp(val_minus, min_val, max_val)
 
-        weights_plus["version"] = f"tuning-spsa-k{k}-plus"
-        weights_minus["version"] = f"tuning-spsa-k{k}-minus"
+            weights_plus["version"] = f"tuning-spsa-k{k}-plus"
+            weights_minus["version"] = f"tuning-spsa-k{k}-minus"
 
-        # Evaluate both perturbations against the baseline
-        # Use different start seeds for evaluations to reduce cross-correlation bias
-        eval_seed = 2000 + k * 100
-        wr_plus, margin_plus, cand_plus, opp_plus = evaluate_candidate(
-            cli_path,
-            snapshot_path,
-            weights_plus,
-            baseline,
-            args.games_per_eval,
-            args.turn_budget_ms,
-            args.max_turns,
-            args.temp_dir,
-            args.parallelism,
-            start_seed=eval_seed,
-        )
+            # Evaluate both perturbations against the baseline
+            # Use different start seeds for evaluations to reduce cross-correlation bias
+            eval_seed = 2000 + k * 100
+            wr_plus, margin_plus, cand_plus, opp_plus = evaluate_candidate(
+                cli_path,
+                snapshot_path,
+                weights_plus,
+                baseline,
+                args.games_per_eval,
+                args.turn_budget_ms,
+                args.max_turns,
+                args.temp_dir,
+                args.parallelism,
+                start_seed=eval_seed,
+            )
 
-        wr_minus, margin_minus, cand_minus, opp_minus = evaluate_candidate(
-            cli_path,
-            snapshot_path,
-            weights_minus,
-            baseline,
-            args.games_per_eval,
-            args.turn_budget_ms,
-            args.max_turns,
-            args.temp_dir,
-            args.parallelism,
-            start_seed=eval_seed,
-        )
+            wr_minus, margin_minus, cand_minus, opp_minus = evaluate_candidate(
+                cli_path,
+                snapshot_path,
+                weights_minus,
+                baseline,
+                args.games_per_eval,
+                args.turn_budget_ms,
+                args.max_turns,
+                args.temp_dir,
+                args.parallelism,
+                start_seed=eval_seed,
+            )
 
-        # Calculate gradient using win rate (maximize win rate against baseline)
-        diff = wr_plus - wr_minus
+            # Calculate gradient using win rate (maximize win rate against baseline)
+            diff = wr_plus - wr_minus
 
-        # Log event structure
-        log_entry = {
-            "iteration": k,
-            "timestamp": datetime.datetime.now().isoformat(),
-            "step_size_ak": ak,
-            "pert_size_ck": ck,
-            "win_rate_plus": wr_plus,
-            "win_rate_minus": wr_minus,
-            "margin_plus": margin_plus,
-            "margin_minus": margin_minus,
-            "avg_score_cand_plus": cand_plus,
-            "avg_score_cand_minus": cand_minus,
-            "avg_score_opp_plus": opp_plus,
-            "avg_score_opp_minus": opp_minus,
-            "current_best": dict(current_best),
-            "perturbation": delta,
-        }
+            # Log event structure
+            log_entry = {
+                "iteration": k,
+                "timestamp": datetime.datetime.now().isoformat(),
+                "step_size_ak": ak,
+                "pert_size_ck": ck,
+                "win_rate_plus": wr_plus,
+                "win_rate_minus": wr_minus,
+                "margin_plus": margin_plus,
+                "margin_minus": margin_minus,
+                "avg_score_cand_plus": cand_plus,
+                "avg_score_cand_minus": cand_minus,
+                "avg_score_opp_plus": opp_plus,
+                "avg_score_opp_minus": opp_minus,
+                "current_best": dict(current_best),
+                "perturbation": delta,
+            }
 
-        # Update parameters
-        new_best = dict(current_best)
-        for key, sign in delta.items():
-            # Estimate gradient component
-            # g_i = (wr_plus - wr_minus) / (2 * ck * sign)
-            g_i = (diff / (2.0 * ck)) * sign
-            val_next = current_best[key] + ak * g_i
-            min_val, max_val = PARAM_BOUNDS[key]
-            new_best[key] = clamp(int(round(val_next)), min_val, max_val)
+            # Update parameters
+            new_best = dict(current_best)
+            for key, sign in delta.items():
+                # Estimate gradient component
+                # g_i = (wr_plus - wr_minus) / (2 * ck * sign)
+                g_i = (diff / (2.0 * ck)) * sign
+                val_next = current_best[key] + ak * g_i
+                min_val, max_val = PARAM_BOUNDS[key]
+                new_best[key] = clamp(int(round(val_next)), min_val, max_val)
 
-        current_best = new_best
-        current_best["version"] = f"refined-spsa-k{k}"
+            current_best = new_best
+            current_best["version"] = f"refined-spsa-k{k}"
 
-        log_entry["new_best"] = dict(current_best)
+            log_entry["new_best"] = dict(current_best)
 
-        # Append structured JSON event line
-        with log_file.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(log_entry) + "\n")
+            # Append structured JSON event line
+            with log_file.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry) + "\n")
 
-        print(
-            f"Iteration {k:03d} | wr+: {wr_plus:.2%}, wr-: {wr_minus:.2%} | "
-            f"Plus Scores: {cand_plus:.1f} vs {opp_plus:.1f} | "
-            f"Best Denial: {current_best['opponentDenialPercent']}%, DenialEarly: {current_best['opponentDenialPercentEarly']}%",
-            flush=True,
-        )
+            print(
+                f"Iteration {k:03d} | wr+: {wr_plus:.2%}, wr-: {wr_minus:.2%} | "
+                f"Plus Scores: {cand_plus:.1f} vs {opp_plus:.1f} | "
+                f"Best Denial: {current_best['opponentDenialPercent']}%, DenialEarly: {current_best['opponentDenialPercentEarly']}%",
+                flush=True,
+            )
+    except KeyboardInterrupt:
+        print("\n[Ctrl+C] Stopping early. Saving current best weights...", flush=True)
 
     # Save final optimized weights
     final_path = Path("docs/weights.optimized.json")
