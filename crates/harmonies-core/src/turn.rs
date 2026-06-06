@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     cards::CardCatalog,
+    eval::EvalWeights,
     model::{ActiveCard, Color, Coord, PlayerState},
     moves::{apply_settlement, legal_settlements},
     rules::place_token,
-    scoring::score_player,
     BoardSide,
 };
 
@@ -59,6 +59,8 @@ pub fn generate_current_turn_sequences(
     catalog: &CardCatalog,
     board_side: BoardSide,
     beam_width: usize,
+    weights: &EvalWeights,
+    t: f64,
 ) -> Vec<TurnSequence> {
     let mut initial_tokens = tokens.to_vec();
     initial_tokens.sort_by_key(color_sort_key);
@@ -93,7 +95,7 @@ pub fn generate_current_turn_sequences(
         }
         next_frontier.retain(|state| seen.insert(calculate_state_hash(state)));
         next_frontier.sort_by_cached_key(|state| {
-            Reverse(score_player(&state.player, board_side, catalog).total())
+            Reverse(crate::eval::eval_player(&state.player, board_side, catalog, weights, t))
         });
         next_frontier.truncate(beam_width);
         frontier = next_frontier;
@@ -268,6 +270,8 @@ mod tests {
             &catalog,
             BoardSide::SideA,
             32,
+            &EvalWeights::default(),
+            0.0,
         );
         assert!(turns.iter().any(|turn| {
             turn.steps
@@ -310,6 +314,8 @@ mod tests {
             &CardCatalog::default(),
             BoardSide::SideA,
             32,
+            &EvalWeights::default(),
+            0.0,
         );
         assert!(turns.iter().any(|turn| {
             matches!(turn.steps.first(), Some(TurnStep::ChooseSpirit { .. }))
@@ -383,6 +389,8 @@ mod tests {
             &catalog,
             BoardSide::SideA,
             64,
+            &EvalWeights::default(),
+            0.0,
         );
         assert!(turns.iter().all(|turn| {
             turn.steps.iter().all(|step| {
@@ -412,6 +420,8 @@ mod tests {
             &CardCatalog::default(),
             BoardSide::SideA,
             32,
+            &EvalWeights::default(),
+            0.0,
         );
         assert_eq!(turns.len(), 1);
         assert_eq!(turns[0].player.empty_hexes, 0);
@@ -423,6 +433,8 @@ mod tests {
             &CardCatalog::default(),
             BoardSide::SideA,
             32,
+            &EvalWeights::default(),
+            0.0,
         );
         assert_eq!(turns_trunk.len(), 2);
         let turn_empty = turns_trunk

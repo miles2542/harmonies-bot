@@ -2,6 +2,7 @@ use std::time::{Duration, Instant};
 
 use rayon::prelude::*;
 
+mod cache;
 mod deck;
 mod denial;
 mod refill;
@@ -83,6 +84,7 @@ pub fn search_current_player_turn_with_progress(
         });
     }
 
+    let tt = cache::TranspositionTable::new(23);
     for depth in 1..=settings.future_depth {
         if progress.stopped_early || should_cancel() || Instant::now() >= deadline {
             progress.stopped_early = true;
@@ -99,6 +101,7 @@ pub fn search_current_player_turn_with_progress(
             deadline,
             &should_cancel,
             &mut progress,
+            &tt,
         );
         if !progress.stopped_early {
             progress.depth_completed = depth;
@@ -133,6 +136,15 @@ fn sorted_plans(roots: &[RootCandidate], max_results: usize) -> Vec<MovePlanV1> 
         .collect()
 }
 
+fn get_opponents(snapshot: &GameSnapshotV1, player_id: &str) -> Vec<PlayerState> {
+    snapshot
+        .players
+        .iter()
+        .filter(|p| p.player_id != player_id)
+        .cloned()
+        .collect()
+}
+
 fn root_candidates(
     snapshot: &GameSnapshotV1,
     player: &PlayerState,
@@ -142,6 +154,8 @@ fn root_candidates(
     progress: &mut SearchProgress,
 ) -> Vec<RootCandidate> {
     let started = Instant::now();
+    let opponents = get_opponents(snapshot, &player.player_id);
+    let t = crate::eval::calculate_phase_index(player, &opponents, &snapshot.bag_counts);
     let group_results: Vec<_> = snapshot
         .central_token_groups
         .par_iter()
@@ -157,6 +171,8 @@ fn root_candidates(
                 catalog,
                 snapshot.board_side,
                 settings.root_turn_beam_width,
+                weights,
+                t,
             );
             let sequences_generated = turns.len();
             let turns =
@@ -167,7 +183,10 @@ fn root_candidates(
                             &mut best_by_choice,
                             turn,
                             snapshot,
+                            &opponents,
                             catalog,
+                            weights,
+                            t,
                         );
                         best_by_choice
                     });
@@ -175,14 +194,14 @@ fn root_candidates(
                 .into_iter()
                 .map(|turn| {
                     let immediate = score_player(&turn.player, snapshot.board_side, catalog);
-                    let future_estimate = immediate.total();
+                    let future_estimate = crate::eval::eval_player(&turn.player, snapshot.board_side, catalog, weights, t);
                     RootCandidate {
                         group_index,
                         tokens: tokens.clone(),
                         turn,
                         immediate,
                         future_estimate,
-                        utility_estimate: weights.utility(future_estimate, 0),
+                        utility_estimate: weights.utility(future_estimate, 0, t),
                         opponent_denial_estimate: 0,
                     }
                 })
@@ -210,15 +229,18 @@ fn upsert_best_turn_by_spirit_choice(
     best_by_choice: &mut Vec<TurnSequence>,
     turn: TurnSequence,
     snapshot: &GameSnapshotV1,
+    _opponents: &[PlayerState],
     catalog: &CardCatalog,
+    weights: &EvalWeights,
+    t: f64,
 ) {
     let choice = spirit_choice_key(&turn);
-    let score = score_player(&turn.player, snapshot.board_side, catalog).total();
+    let score = crate::eval::eval_player(&turn.player, snapshot.board_side, catalog, weights, t);
     if let Some(existing) = best_by_choice
         .iter_mut()
         .find(|existing| spirit_choice_key(existing) == choice)
     {
-        let existing_score = score_player(&existing.player, snapshot.board_side, catalog).total();
+        let existing_score = crate::eval::eval_player(&existing.player, snapshot.board_side, catalog, weights, t);
         if score > existing_score {
             *existing = turn;
         }
@@ -245,7 +267,16 @@ fn estimate_depth(
     deadline: Instant,
     should_cancel: &(impl Fn() -> bool + Sync),
     progress: &mut SearchProgress,
+    tt: &cache::TranspositionTable,
 ) {
+    let player = snapshot
+        .players
+        .iter()
+        .find(|p| p.player_id == snapshot.perspective_player_id)
+        .expect("perspective player missing");
+    let opponents = get_opponents(snapshot, &player.player_id);
+    let t = crate::eval::calculate_phase_index(player, &opponents, &snapshot.bag_counts);
+
     let outcomes: Vec<SearchProgress> = roots
         .par_iter_mut()
         .enumerate()
@@ -259,6 +290,8 @@ fn estimate_depth(
                 root,
                 snapshot,
                 catalog,
+                weights,
+                &opponents,
                 settings,
                 seed.wrapping_add(index as u64),
             );
@@ -266,16 +299,19 @@ fn estimate_depth(
                 state,
                 snapshot.board_side,
                 catalog,
+                weights,
+                &opponents,
                 settings,
                 seed.wrapping_add(index as u64),
                 depth,
                 deadline,
                 should_cancel,
                 &mut local_progress,
+                tt,
             );
-            root.future_estimate = future.max(root.immediate.total());
+            root.future_estimate = future.max(crate::eval::eval_player(&root.turn.player, snapshot.board_side, catalog, weights, t));
             root.utility_estimate =
-                weights.utility(root.future_estimate, root.opponent_denial_estimate);
+                weights.utility(root.future_estimate, root.opponent_denial_estimate, t);
             local_progress
         })
         .collect();
@@ -290,13 +326,21 @@ fn future_value(
     initial: FutureState,
     board_side: BoardSide,
     catalog: &CardCatalog,
+    weights: &EvalWeights,
+    opponents: &[PlayerState],
     settings: &SearchSettings,
     seed: u64,
     depth_remaining: usize,
     deadline: Instant,
     should_cancel: &(impl Fn() -> bool + Sync),
     progress: &mut SearchProgress,
+    tt: &cache::TranspositionTable,
 ) -> i32 {
+    let initial_hash = cache::hash_future_state(&initial);
+    if let Some(cached) = tt.lookup(initial_hash, depth_remaining) {
+        return cached;
+    }
+
     let mut frontier = vec![initial];
     let mut best = frontier[0].score;
     for depth in 0..depth_remaining {
@@ -314,6 +358,16 @@ fn future_value(
                     local_progress.stopped_early = true;
                     return (output, local_progress);
                 }
+                
+                let current_depth_remaining = depth_remaining - depth;
+                let hash = cache::hash_future_state(&state);
+                if let Some(cached_score) = tt.lookup(hash, current_depth_remaining) {
+                    let mut cached_state = state.clone();
+                    cached_state.score = cached_score;
+                    output.push(cached_state);
+                    return (output, local_progress);
+                }
+
                 let state_seed = seed
                     .wrapping_add(depth as u64)
                     .wrapping_add((state_index as u64).wrapping_mul(1_000_003));
@@ -321,6 +375,8 @@ fn future_value(
                     state,
                     board_side,
                     catalog,
+                    weights,
+                    opponents,
                     settings,
                     state_seed,
                     deadline,
@@ -349,6 +405,8 @@ fn future_value(
         best = best.max(next[0].score);
         frontier = next;
     }
+    
+    tt.store(initial_hash, depth_remaining, best);
     best
 }
 
@@ -356,6 +414,8 @@ fn expand_future_state(
     state: FutureState,
     board_side: BoardSide,
     catalog: &CardCatalog,
+    weights: &EvalWeights,
+    opponents: &[PlayerState],
     settings: &SearchSettings,
     seed: u64,
     deadline: Instant,
@@ -372,6 +432,7 @@ fn expand_future_state(
             progress.stopped_early = true;
             return;
         }
+        let t_state = crate::eval::calculate_phase_index(&state.player, opponents, &state.bag_counts);
         let turns = generate_current_turn_sequences(
             &state.player,
             tokens,
@@ -379,9 +440,10 @@ fn expand_future_state(
             catalog,
             board_side,
             settings.future_turn_beam_width,
+            weights,
+            t_state,
         );
         for turn in turns.into_iter().take(settings.future_branch_width) {
-            let score = score_player(&turn.player, board_side, catalog).total();
             for refill in candidate_refills(&state.bag_counts, 1, seed) {
                 let mut central_groups = state.central_groups.clone();
                 central_groups[group_index] = refill.clone();
@@ -390,6 +452,8 @@ fn expand_future_state(
                     .iter()
                     .copied()
                     .for_each(|color| bag_counts.saturating_sub_color(color));
+                let t = crate::eval::calculate_phase_index(&turn.player, opponents, &bag_counts);
+                let score = crate::eval::eval_player(&turn.player, board_side, catalog, weights, t);
                 for (river_cards, unseen_cards) in river_after_turn_with_refills(
                     &state.river_cards,
                     &turn,
@@ -426,6 +490,8 @@ fn state_after_root(
     root: &RootCandidate,
     snapshot: &GameSnapshotV1,
     catalog: &CardCatalog,
+    weights: &EvalWeights,
+    opponents: &[PlayerState],
     settings: &SearchSettings,
     seed: u64,
 ) -> FutureState {
@@ -456,13 +522,15 @@ fn state_after_root(
     .into_iter()
     .next()
     .unwrap_or_else(|| (snapshot.river_cards.clone(), unseen_cards));
+    let t = crate::eval::calculate_phase_index(&root.turn.player, opponents, &bag_counts);
+    let score = crate::eval::eval_player(&root.turn.player, snapshot.board_side, catalog, weights, t);
     FutureState {
         player: root.turn.player.clone(),
         central_groups,
         river_cards: river_branch.0,
         unseen_cards: river_branch.1,
         bag_counts,
-        score: root.immediate.total(),
+        score,
     }
 }
 
