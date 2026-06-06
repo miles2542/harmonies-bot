@@ -93,7 +93,7 @@ fn infer_bag_counts(
     for color in players
         .iter()
         .flat_map(|player| &player.cells)
-        .flat_map(|cell| cell.stack.tokens.iter().copied())
+        .flat_map(|cell| cell.stack.as_slice().iter().copied())
         .chain(central_token_groups.iter().flatten().copied())
     {
         subtract_visible_token(&mut counts, color);
@@ -152,15 +152,18 @@ fn normalize_player(
                 .iter()
                 .map(|id| cell_key(id, coord))
                 .find(|key| token_stacks.contains_key(key) || player_cubes.contains(key));
+            let tokens = key
+                .as_ref()
+                .and_then(|key| token_stacks.get(key))
+                .cloned()
+                .unwrap_or_default();
+            let mut stack = Stack::default();
+            for t in tokens {
+                stack.push(t);
+            }
             Cell {
                 coord,
-                stack: Stack {
-                    tokens: key
-                        .as_ref()
-                        .and_then(|key| token_stacks.get(key))
-                        .cloned()
-                        .unwrap_or_default(),
-                },
+                stack,
                 locked_by_cube: key.map(|key| player_cubes.contains(&key)).unwrap_or(false)
                     || player_cube_coords.contains(&coord),
             }

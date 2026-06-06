@@ -83,23 +83,87 @@ impl BagCounts {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Stack {
-    pub tokens: Vec<Color>,
+    pub tokens: [Color; 3],
+    pub height: u8,
+}
+
+impl Default for Stack {
+    fn default() -> Self {
+        Self {
+            tokens: [Color::Water; 3],
+            height: 0,
+        }
+    }
+}
+
+impl Serialize for Stack {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("Stack", 1)?;
+        state.serialize_field("tokens", self.as_slice())?;
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Stack {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct StackHelper {
+            tokens: Vec<Color>,
+        }
+        let helper = StackHelper::deserialize(deserializer)?;
+        let mut stack = Stack::default();
+        for token in helper.tokens {
+            stack.push(token);
+        }
+        Ok(stack)
+    }
 }
 
 impl Stack {
     pub fn height(&self) -> usize {
-        self.tokens.len()
+        self.height as usize
     }
 
     pub fn top(&self) -> Option<Color> {
-        self.tokens.last().copied()
+        if self.height > 0 {
+            Some(self.tokens[self.height as usize - 1])
+        } else {
+            None
+        }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.tokens.is_empty()
+        self.height == 0
+    }
+
+    pub fn as_slice(&self) -> &[Color] {
+        &self.tokens[..self.height as usize]
+    }
+
+    pub fn push(&mut self, color: Color) {
+        if (self.height as usize) < 3 {
+            self.tokens[self.height as usize] = color;
+            self.height += 1;
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<Color> {
+        if self.height > 0 {
+            let val = self.tokens[self.height as usize - 1];
+            self.height -= 1;
+            Some(val)
+        } else {
+            None
+        }
     }
 }
 

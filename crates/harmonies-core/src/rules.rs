@@ -28,12 +28,12 @@ pub fn can_place(cell: &Cell, color: Color) -> Result<(), PlacementError> {
 
 pub fn is_legal_stack_after_place(stack: &Stack, color: Color) -> bool {
     match color {
-        Color::Mountain => stack.tokens.iter().all(|token| *token == Color::Mountain),
+        Color::Mountain => stack.as_slice().iter().all(|token| *token == Color::Mountain),
         Color::Trunk => {
-            stack.height() < 2 && stack.tokens.iter().all(|token| *token == Color::Trunk)
+            stack.height() < 2 && stack.as_slice().iter().all(|token| *token == Color::Trunk)
         }
         Color::Foliage => {
-            stack.is_empty() || stack.tokens.iter().all(|token| *token == Color::Trunk)
+            stack.is_empty() || stack.as_slice().iter().all(|token| *token == Color::Trunk)
         }
         Color::Building => {
             stack.height() < 2
@@ -48,7 +48,7 @@ pub fn is_legal_stack_after_place(stack: &Stack, color: Color) -> bool {
 
 pub fn place_token(cell: &mut Cell, color: Color) -> Result<(), PlacementError> {
     can_place(cell, color)?;
-    cell.stack.tokens.push(color);
+    cell.stack.push(color);
     Ok(())
 }
 
@@ -59,9 +59,13 @@ mod tests {
     use super::*;
 
     fn cell(tokens: Vec<Color>) -> Cell {
+        let mut stack = Stack::default();
+        for t in tokens {
+            stack.push(t);
+        }
         Cell {
             coord: Coord { col: 0, row: 0 },
-            stack: Stack { tokens },
+            stack,
             locked_by_cube: false,
         }
     }

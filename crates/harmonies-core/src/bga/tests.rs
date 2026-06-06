@@ -33,8 +33,8 @@ fn normalizes_observed_tutorial_shape() {
     let snapshot = normalize_gamedatas(&raw, Some("p1")).unwrap();
     assert_eq!(snapshot.board_side, BoardSide::SideA);
     assert_eq!(
-        snapshot.players[0].cells[0].stack.tokens,
-        vec![Color::Trunk, Color::Foliage]
+        snapshot.players[0].cells[0].stack.as_slice(),
+        &[Color::Trunk, Color::Foliage]
     );
     assert_eq!(
         snapshot.central_token_groups[0],
@@ -79,8 +79,8 @@ fn maps_anonymized_player_key_to_numeric_cell_prefix() {
     let snapshot = normalize_gamedatas(&raw, None).unwrap();
     assert_eq!(snapshot.active_player_id, "player_1");
     assert_eq!(
-        snapshot.players[0].cells[0].stack.tokens,
-        vec![Color::Trunk, Color::Foliage]
+        snapshot.players[0].cells[0].stack.as_slice(),
+        &[Color::Trunk, Color::Foliage]
     );
 }
 

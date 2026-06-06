@@ -86,7 +86,7 @@ pub fn stack_matches_colors(stack: &Stack, colors: &[u8]) -> bool {
             Some(c) => c,
             None => return false,
         };
-        if stack.tokens[stack.height() - 1 - i] != expected {
+        if stack.as_slice()[stack.height() - 1 - i] != expected {
             return false;
         }
     }
@@ -122,9 +122,13 @@ mod tests {
     use super::*;
 
     fn cell(col: i8, row: i8, tokens: Vec<Color>) -> Cell {
+        let mut stack = Stack::default();
+        for t in tokens {
+            stack.push(t);
+        }
         Cell {
             coord: Coord { col, row },
-            stack: Stack { tokens },
+            stack,
             locked_by_cube: false,
         }
     }
@@ -146,18 +150,19 @@ mod tests {
 
     #[test]
     fn pattern_stack_colors_are_top_to_bottom() {
-        let stack = Stack {
-            tokens: vec![Color::Trunk, Color::Trunk, Color::Foliage],
-        };
+        let mut stack = Stack::default();
+        stack.push(Color::Trunk);
+        stack.push(Color::Trunk);
+        stack.push(Color::Foliage);
         assert!(stack_matches_colors(&stack, &[4, 3, 3]));
         assert!(!stack_matches_colors(&stack, &[3, 3, 4]));
     }
 
     #[test]
     fn building_alias_matches_any_building_top() {
-        let stack = Stack {
-            tokens: vec![Color::Mountain, Color::Building],
-        };
+        let mut stack = Stack::default();
+        stack.push(Color::Mountain);
+        stack.push(Color::Building);
         assert!(stack_matches_colors(&stack, &[6, 7]));
     }
 

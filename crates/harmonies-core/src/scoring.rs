@@ -69,7 +69,7 @@ fn score_trees(player: &PlayerState) -> i32 {
     player
         .cells
         .iter()
-        .map(|cell| match cell.stack.tokens.as_slice() {
+        .map(|cell| match cell.stack.as_slice() {
             [Color::Foliage] => 1,
             [Color::Trunk, Color::Foliage] => 3,
             [Color::Trunk, Color::Trunk, Color::Foliage] => 7,
@@ -195,14 +195,14 @@ fn is_mountain_stack(cell: &Cell) -> bool {
     !cell.stack.is_empty()
         && cell
             .stack
-            .tokens
+            .as_slice()
             .iter()
             .all(|token| *token == Color::Mountain)
 }
 
 fn is_building_stack(cell: &Cell) -> bool {
     matches!(
-        cell.stack.tokens.as_slice(),
+        cell.stack.as_slice(),
         [Color::Building, Color::Building]
             | [Color::Trunk, Color::Building]
             | [Color::Mountain, Color::Building]

@@ -211,9 +211,13 @@ mod tests {
     use super::*;
 
     fn cell(col: i8, row: i8, tokens: Vec<Color>) -> Cell {
+        let mut stack = Stack::default();
+        for t in tokens {
+            stack.push(t);
+        }
         Cell {
             coord: Coord { col, row },
-            stack: Stack { tokens },
+            stack,
             locked_by_cube: false,
         }
     }
