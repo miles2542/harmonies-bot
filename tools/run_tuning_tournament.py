@@ -14,21 +14,21 @@ from typing import Any
 
 # Define the tuning bounds for all parameters
 PARAM_BOUNDS: dict[str, tuple[int, int]] = {
-    "opponentDenialPercent": (0, 100),
-    "selfScorePercentEarly": (50, 150),
-    "selfScorePercentLate": (50, 150),
-    "opponentDenialPercentEarly": (0, 100),
-    "opponentDenialPercentLate": (0, 100),
-    "completionProximityEarly": (0, 50),
-    "completionProximityLate": (0, 50),
-    "heightVarianceEarly": (-30, 0),
-    "heightVarianceLate": (-30, 0),
-    "wastedHeightPenaltyEarly": (-50, 0),
-    "wastedHeightPenaltyLate": (-50, 0),
-    "spiritOffsetEarly": (0, 50),
-    "spiritOffsetLate": (0, 50),
-    "spiritAbandonmentThreshold": (0, 10),
-    "denialExponent": (50, 300),
+    "opponentDenialPercent": (0, 200),
+    "selfScorePercentEarly": (10, 250),
+    "selfScorePercentLate": (10, 250),
+    "opponentDenialPercentEarly": (0, 200),
+    "opponentDenialPercentLate": (0, 200),
+    "completionProximityEarly": (0, 150),
+    "completionProximityLate": (0, 150),
+    "heightVarianceEarly": (-100, 0),
+    "heightVarianceLate": (-100, 0),
+    "wastedHeightPenaltyEarly": (-150, 0),
+    "wastedHeightPenaltyLate": (-150, 0),
+    "spiritOffsetEarly": (-50, 150),
+    "spiritOffsetLate": (-50, 150),
+    "spiritAbandonmentThreshold": (0, 25),
+    "denialExponent": (10, 500),
 }
 
 
@@ -77,10 +77,10 @@ def run_single_game(
     turn_budget_ms: int,
     max_turns: int,
     temp_dir: Path,
-) -> tuple[float, float]:
+) -> tuple[float, float, float, float]:
     """
     Run a single self-play game between candidate and opponent.
-    Returns: (score_margin, win_points) where win_points is 1.0 for candidate win, 0.5 for draw, 0.0 for loss.
+    Returns: (score_margin, win_points, candidate_score, opponent_score)
     """
     task_id: str = uuid.uuid4().hex
     candidate_file: Path = temp_dir / f"cand_{task_id}.json"
@@ -116,9 +116,6 @@ def run_single_game(
         report: dict[str, Any] = json.loads(result.stdout)
 
         final_scores: list[dict[str, Any]] = report.get("finalScores", [])
-        if len(final_scores) < 2:
-            return 0.0, 0.0
-
         p1_score: int = final_scores[0]["total"]
         p2_score: int = final_scores[1]["total"]
 
@@ -137,10 +134,10 @@ def run_single_game(
         else:
             outcome = 0.0
 
-        return margin, outcome
+        return margin, outcome, float(candidate_score), float(opponent_score)
     except Exception as e:
         print(f"Error executing game (seed={seed}): {e}", file=sys.stderr)
-        return 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0
     finally:
         # Cleanup
         if candidate_file.exists():
@@ -160,12 +157,12 @@ def evaluate_candidate(
     temp_dir: Path,
     parallelism: int,
     start_seed: int = 1000,
-) -> tuple[float, float]:
+) -> tuple[float, float, float, float]:
     """
     Run num_games balanced matches of candidate vs baseline.
-    Returns: (average_win_rate, average_score_margin)
+    Returns: (average_win_rate, average_score_margin, avg_candidate_score, avg_baseline_score)
     """
-    futures: list[concurrent.futures.Future[tuple[float, float]]] = []
+    futures: list[concurrent.futures.Future[tuple[float, float, float, float]]] = []
     # Half the games candidate is Player 1, half Player 2
     games_to_run: int = (num_games // 2) * 2
 
@@ -188,15 +185,19 @@ def evaluate_candidate(
                 )
             )
 
-        results: list[tuple[float, float]] = [f.result() for f in futures]
+        results: list[tuple[float, float, float, float]] = [f.result() for f in futures]
 
     margins: list[float] = [r[0] for r in results]
     win_points: list[float] = [r[1] for r in results]
+    cand_scores: list[float] = [r[2] for r in results]
+    opp_scores: list[float] = [r[3] for r in results]
 
     avg_margin: float = sum(margins) / len(margins) if margins else 0.0
     avg_win_rate: float = sum(win_points) / len(win_points) if win_points else 0.0
+    avg_cand: float = sum(cand_scores) / len(cand_scores) if cand_scores else 0.0
+    avg_opp: float = sum(opp_scores) / len(opp_scores) if opp_scores else 0.0
 
-    return avg_win_rate, avg_margin
+    return avg_win_rate, avg_margin, avg_cand, avg_opp
 
 
 def build_binary() -> Path:
@@ -248,7 +249,7 @@ def main() -> None:
 
     # Initial evaluation of baseline vs itself to establish noise level
     print("Running initial baseline self-check...", flush=True)
-    base_wr, base_margin = evaluate_candidate(
+    base_wr, base_margin, base_cand, base_opp = evaluate_candidate(
         cli_path,
         snapshot_path,
         current_best,
@@ -260,7 +261,7 @@ def main() -> None:
         args.parallelism,
         start_seed=1000,
     )
-    print(f"Baseline vs Baseline: Win Rate = {base_wr:.2%}, Margin = {base_margin:.2f}")
+    print(f"Baseline vs Baseline: Win Rate = {base_wr:.2%}, Margin = {base_margin:.2f} (Avg Scores: {base_cand:.1f} vs {base_opp:.1f})")
 
     # Main SPSA Loop
     alpha = 0.602
@@ -292,7 +293,7 @@ def main() -> None:
         # Evaluate both perturbations against the baseline
         # Use different start seeds for evaluations to reduce cross-correlation bias
         eval_seed = 2000 + k * 100
-        wr_plus, margin_plus = evaluate_candidate(
+        wr_plus, margin_plus, cand_plus, opp_plus = evaluate_candidate(
             cli_path,
             snapshot_path,
             weights_plus,
@@ -305,7 +306,7 @@ def main() -> None:
             start_seed=eval_seed,
         )
 
-        wr_minus, margin_minus = evaluate_candidate(
+        wr_minus, margin_minus, cand_minus, opp_minus = evaluate_candidate(
             cli_path,
             snapshot_path,
             weights_minus,
@@ -331,6 +332,10 @@ def main() -> None:
             "win_rate_minus": wr_minus,
             "margin_plus": margin_plus,
             "margin_minus": margin_minus,
+            "avg_score_cand_plus": cand_plus,
+            "avg_score_cand_minus": cand_minus,
+            "avg_score_opp_plus": opp_plus,
+            "avg_score_opp_minus": opp_minus,
             "current_best": dict(current_best),
             "perturbation": delta,
         }
@@ -356,6 +361,7 @@ def main() -> None:
 
         print(
             f"Iteration {k:03d} | wr+: {wr_plus:.2%}, wr-: {wr_minus:.2%} | "
+            f"Plus Scores: {cand_plus:.1f} vs {opp_plus:.1f} | "
             f"Best Denial: {current_best['opponentDenialPercent']}%, DenialEarly: {current_best['opponentDenialPercentEarly']}%",
             flush=True,
         )
