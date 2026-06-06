@@ -5,7 +5,7 @@ use crate::model::Coord;
 pub const DIRECTIONS: usize = 6;
 
 pub fn neighbor(coord: Coord, direction: usize) -> Coord {
-    let even = coord.col % 2 == 0;
+    let even = (coord.col & 1) == 0;
     let (dc, dr) = match (even, direction) {
         (true, 0) => (1, 0),
         (true, 1) => (1, -1),

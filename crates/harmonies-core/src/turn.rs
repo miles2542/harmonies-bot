@@ -154,11 +154,12 @@ fn expand_placements(state: &TurnState, output: &mut Vec<TurnState>) {
             continue;
         }
         for cell_index in 0..state.player.cells.len() {
-            let mut next = state.clone();
-            let was_empty = next.player.cells[cell_index].stack.is_empty();
-            if place_token(&mut next.player.cells[cell_index], token).is_err() {
+            if crate::rules::can_place(&state.player.cells[cell_index], token).is_err() {
                 continue;
             }
+            let mut next = state.clone();
+            let was_empty = next.player.cells[cell_index].stack.is_empty();
+            let _ = place_token(&mut next.player.cells[cell_index], token);
             if was_empty {
                 next.player.empty_hexes = next.player.empty_hexes.saturating_sub(1);
             }
