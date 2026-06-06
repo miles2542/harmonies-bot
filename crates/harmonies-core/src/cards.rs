@@ -78,16 +78,19 @@ pub fn stack_matches_colors(stack: &Stack, colors: &[u8]) -> bool {
     if colors == [6, 7] {
         return stack.top() == Some(Color::Building);
     }
-
-    let expected: Option<Vec<Color>> = colors
-        .iter()
-        .rev()
-        .map(|raw| Color::from_bga_type_arg(*raw))
-        .collect();
-
-    expected
-        .map(|tokens| tokens == stack.tokens)
-        .unwrap_or(false)
+    if colors.len() != stack.height() {
+        return false;
+    }
+    for (i, &raw) in colors.iter().enumerate() {
+        let expected = match Color::from_bga_type_arg(raw) {
+            Some(c) => c,
+            None => return false,
+        };
+        if stack.tokens[stack.height() - 1 - i] != expected {
+            return false;
+        }
+    }
+    true
 }
 
 pub fn find_pattern_matches<'a>(

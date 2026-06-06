@@ -1,4 +1,8 @@
-use std::{cmp::Reverse, collections::HashSet};
+use std::{
+    cmp::Reverse,
+    collections::{hash_map::DefaultHasher, HashSet},
+    hash::{Hash, Hasher},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -87,7 +91,7 @@ pub fn generate_current_turn_sequences(
         if next_frontier.is_empty() {
             break;
         }
-        next_frontier.retain(|state| seen.insert(state_key(state)));
+        next_frontier.retain(|state| seen.insert(calculate_state_hash(state)));
         next_frontier.sort_by_cached_key(|state| {
             Reverse(score_player(&state.player, board_side, catalog).total())
         });
@@ -177,30 +181,13 @@ fn dedupe_final_sequences(sequences: Vec<TurnSequence>) -> Vec<TurnSequence> {
     unique
 }
 
-fn state_key(state: &TurnState) -> String {
-    let stacks = state
-        .player
-        .cells
-        .iter()
-        .map(|cell| {
-            format!(
-                "{:?}:{:?}:{}",
-                cell.coord, cell.stack.tokens, cell.locked_by_cube
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("|");
-    let cards = state
-        .player
-        .active_cards
-        .iter()
-        .map(|card| format!("{}:{}", card.card_id, card.remaining_cubes))
-        .collect::<Vec<_>>()
-        .join("|");
-    format!(
-        "{stacks}#{cards}#{:?}#{}",
-        state.remaining_tokens, state.draft_done
-    )
+fn calculate_state_hash(state: &TurnState) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    state.player.cells.hash(&mut hasher);
+    state.player.active_cards.hash(&mut hasher);
+    state.remaining_tokens.hash(&mut hasher);
+    state.draft_done.hash(&mut hasher);
+    hasher.finish()
 }
 
 fn color_sort_key(color: &Color) -> u8 {

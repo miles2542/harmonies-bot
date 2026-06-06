@@ -210,14 +210,39 @@ fn is_building_stack(cell: &Cell) -> bool {
 }
 
 fn longest_shortest_water_path(water: &HashSet<Coord>) -> usize {
-    water
+    let mut max_path = 0;
+    let mut visited = HashSet::new();
+
+    let terminals: Vec<Coord> = water
         .iter()
-        .map(|start| farthest_shortest_path(*start, water))
-        .max()
-        .unwrap_or(0)
+        .copied()
+        .filter(|&coord| {
+            let water_neighbors = neighbors(coord)
+                .iter()
+                .filter(|n| water.contains(n))
+                .count();
+            water_neighbors <= 1
+        })
+        .collect();
+
+    for start in terminals {
+        let (farthest, seen) = farthest_shortest_path_with_visited(start, water);
+        max_path = max_path.max(farthest);
+        visited.extend(seen);
+    }
+
+    for &coord in water {
+        if !visited.contains(&coord) {
+            let (farthest, seen) = farthest_shortest_path_with_visited(coord, water);
+            max_path = max_path.max(farthest);
+            visited.extend(seen);
+        }
+    }
+
+    max_path
 }
 
-fn farthest_shortest_path(start: Coord, water: &HashSet<Coord>) -> usize {
+fn farthest_shortest_path_with_visited(start: Coord, water: &HashSet<Coord>) -> (usize, HashSet<Coord>) {
     let mut queue = VecDeque::from([(start, 1usize)]);
     let mut seen = HashSet::from([start]);
     let mut farthest = 1;
@@ -229,7 +254,7 @@ fn farthest_shortest_path(start: Coord, water: &HashSet<Coord>) -> usize {
             }
         }
     }
-    farthest
+    (farthest, seen)
 }
 
 fn river_score(length: usize) -> i32 {

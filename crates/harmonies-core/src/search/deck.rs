@@ -75,17 +75,14 @@ fn visible_normal_type_args(snapshot: &GameSnapshotV1) -> HashSet<u8> {
 }
 
 fn remove_drafted_card(river: &[ActiveCard], turn: &TurnSequence) -> Vec<ActiveCard> {
-    let drafted: HashSet<u32> = turn
-        .steps
-        .iter()
-        .filter_map(|step| match step {
-            TurnStep::DraftCard { card_id, .. } => Some(*card_id),
-            _ => None,
-        })
-        .collect();
     river
         .iter()
-        .filter(|card| !drafted.contains(&card.card_id))
+        .filter(|card| {
+            !turn.steps.iter().any(|step| match step {
+                TurnStep::DraftCard { card_id, .. } => *card_id == card.card_id,
+                _ => false,
+            })
+        })
         .cloned()
         .collect()
 }
