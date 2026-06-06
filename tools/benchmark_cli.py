@@ -28,9 +28,9 @@ class RunResult:
 
 
 def build_cli() -> Path:
-    subprocess.run(["cargo", "build", "-q", "-p", "harmonies-cli"], check=True)
+    subprocess.run(["cargo", "build", "--release", "-q", "-p", "harmonies-cli"], check=True)
     suffix = ".exe" if os.name == "nt" else ""
-    return Path("target") / "debug" / f"harmonies-cli{suffix}"
+    return Path("target") / "release" / f"harmonies-cli{suffix}"
 
 
 def run_once(
