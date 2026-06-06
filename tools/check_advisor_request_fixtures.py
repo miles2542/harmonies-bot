@@ -80,8 +80,8 @@ def validate_shape(snapshot: dict[str, Any], player_ids: list[str], issues: list
     if snapshot.get("boardSide") not in {"sideA", "sideB"}:
         issues.append(f"boardSide invalid: {snapshot.get('boardSide')}")
     groups = as_list(snapshot.get("centralTokenGroups"))
-    if len(groups) != 5 or any(len(as_list(group)) != 3 for group in groups):
-        issues.append("centralTokenGroups must be five groups of three tokens")
+    if len(groups) != 5 or any(len(as_list(group)) not in {0, 3} for group in groups):
+        issues.append("centralTokenGroups must be five groups of three or zero tokens")
     for player in as_list(snapshot.get("players")):
         raw_player = as_object(player)
         player_id = str(raw_player.get("playerId"))

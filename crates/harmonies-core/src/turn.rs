@@ -151,8 +151,12 @@ fn expand_placements(state: &TurnState, output: &mut Vec<TurnState>) {
         }
         for cell_index in 0..state.player.cells.len() {
             let mut next = state.clone();
+            let was_empty = next.player.cells[cell_index].stack.is_empty();
             if place_token(&mut next.player.cells[cell_index], token).is_err() {
                 continue;
+            }
+            if was_empty {
+                next.player.empty_hexes = next.player.empty_hexes.saturating_sub(1);
             }
             let coord = next.player.cells[cell_index].coord;
             next.remaining_tokens.remove(token_index);
@@ -397,5 +401,58 @@ mod tests {
                 )
             })
         }));
+    }
+
+    #[test]
+    fn turn_sequence_updates_empty_hexes() {
+        let player = PlayerState {
+            player_id: "p1".into(),
+            cells: vec![cell(0, 0, Vec::new()), cell(1, 0, vec![Color::Trunk])],
+            active_cards: Vec::new(),
+            spirit_card_choices: Vec::new(),
+            completed_cards: Vec::new(),
+            empty_hexes: 1,
+        };
+        let turns = generate_current_turn_sequences(
+            &player,
+            &[Color::Water],
+            &[],
+            &CardCatalog::default(),
+            BoardSide::SideA,
+            32,
+        );
+        assert_eq!(turns.len(), 1);
+        assert_eq!(turns[0].player.empty_hexes, 0);
+
+        let turns_trunk = generate_current_turn_sequences(
+            &player,
+            &[Color::Trunk],
+            &[],
+            &CardCatalog::default(),
+            BoardSide::SideA,
+            32,
+        );
+        assert_eq!(turns_trunk.len(), 2);
+        let turn_empty = turns_trunk
+            .iter()
+            .find(|t| {
+                matches!(
+                    t.steps[0],
+                    TurnStep::PlaceToken { coord, .. } if coord == Coord { col: 0, row: 0 }
+                )
+            })
+            .unwrap();
+        assert_eq!(turn_empty.player.empty_hexes, 0);
+
+        let turn_non_empty = turns_trunk
+            .iter()
+            .find(|t| {
+                matches!(
+                    t.steps[0],
+                    TurnStep::PlaceToken { coord, .. } if coord == Coord { col: 1, row: 0 }
+                )
+            })
+            .unwrap();
+        assert_eq!(turn_non_empty.player.empty_hexes, 1);
     }
 }

@@ -191,8 +191,12 @@ fn generate_placement_sequences_inner(
 
         for cell_index in 0..player.cells.len() {
             let mut next_player = player.clone();
+            let was_empty = next_player.cells[cell_index].stack.is_empty();
             if place_token(&mut next_player.cells[cell_index], token).is_err() {
                 continue;
+            }
+            if was_empty {
+                next_player.empty_hexes = next_player.empty_hexes.saturating_sub(1);
             }
             steps.push(PlacementStep {
                 token,
@@ -417,5 +421,36 @@ mod tests {
         });
 
         assert!(legal_settlements(&player, &catalog).is_empty());
+    }
+
+    #[test]
+    fn placement_sequence_updates_empty_hexes() {
+        let mut p = player(vec![
+            cell(0, 0, Vec::new(), false),
+            cell(1, 0, vec![Color::Trunk], false),
+        ]);
+        p.empty_hexes = 1;
+
+        // 1. Place Water (only legal on empty cell 0,0)
+        let sequences_water = generate_placement_sequences(&p, &[Color::Water]);
+        assert_eq!(sequences_water.len(), 1);
+        assert_eq!(sequences_water[0].player.empty_hexes, 0);
+
+        // 2. Place Trunk on cell 1,0 (non-empty, stack: [Trunk])
+        // It is also legal to place on cell 0,0 (empty).
+        let sequences_trunk = generate_placement_sequences(&p, &[Color::Trunk]);
+        assert_eq!(sequences_trunk.len(), 2);
+
+        let seq_empty = sequences_trunk
+            .iter()
+            .find(|s| s.steps[0].coord == Coord { col: 0, row: 0 })
+            .unwrap();
+        assert_eq!(seq_empty.player.empty_hexes, 0);
+
+        let seq_non_empty = sequences_trunk
+            .iter()
+            .find(|s| s.steps[0].coord == Coord { col: 1, row: 0 })
+            .unwrap();
+        assert_eq!(seq_non_empty.player.empty_hexes, 1);
     }
 }

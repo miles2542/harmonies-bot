@@ -19,6 +19,9 @@ DEFAULT_REQUESTS = [
     Path("fixtures/advisor_requests/sidea_2p_nature_match12_late_active_turn_request.json"),
     Path("fixtures/advisor_requests/sidea_2p_nature_match14_full_hand_request.json"),
     Path("fixtures/advisor_requests/sidea_2p_nature_match14_after_completion_near_end_request.json"),
+    Path("fixtures/advisor_requests/sideb_2p_nature_match15_full_hand_request.json"),
+    Path("fixtures/advisor_requests/sideb_2p_nature_match15_cube_settlement_request.json"),
+    Path("fixtures/advisor_requests/sideb_2p_nature_match15_after_completion_request.json"),
 ]
 CARD_CATALOG_PATH = Path("docs/cards_database.json")
 DIRECTIONS = 6
@@ -122,7 +125,7 @@ def placement_error(cell: CellState, color: ColorName) -> str | None:
         return None
     if color == "foliage" and (not stack or all(token == "trunk" for token in stack)):
         return None
-    if color == "building" and (not stack or stack[-1] in {"trunk", "mountain", "building"}):
+    if color == "building" and len(stack) < 2 and (not stack or stack[-1] in {"trunk", "mountain", "building"}):
         return None
     if color in {"field", "water"} and not stack:
         return None

@@ -35,10 +35,13 @@ pub fn is_legal_stack_after_place(stack: &Stack, color: Color) -> bool {
         Color::Foliage => {
             stack.is_empty() || stack.tokens.iter().all(|token| *token == Color::Trunk)
         }
-        Color::Building => matches!(
-            stack.top(),
-            None | Some(Color::Trunk | Color::Mountain | Color::Building)
-        ),
+        Color::Building => {
+            stack.height() < 2
+                && matches!(
+                    stack.top(),
+                    None | Some(Color::Trunk | Color::Mountain | Color::Building)
+                )
+        }
         Color::Field | Color::Water => stack.is_empty(),
     }
 }
@@ -84,6 +87,14 @@ mod tests {
         assert!(can_place(&cell(vec![Color::Mountain]), Color::Building).is_ok());
         assert_eq!(
             can_place(&cell(vec![Color::Field]), Color::Building),
+            Err(PlacementError::IllegalStack)
+        );
+    }
+
+    #[test]
+    fn building_on_two_height_stack_is_illegal() {
+        assert_eq!(
+            can_place(&cell(vec![Color::Mountain, Color::Building]), Color::Building),
             Err(PlacementError::IllegalStack)
         );
     }
