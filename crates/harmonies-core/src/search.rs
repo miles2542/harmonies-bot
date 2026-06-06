@@ -382,7 +382,7 @@ fn expand_future_state(
         );
         for turn in turns.into_iter().take(settings.future_branch_width) {
             let score = score_player(&turn.player, board_side, catalog).total();
-            for refill in candidate_refills(&state.bag_counts, settings.refill_samples, seed) {
+            for refill in candidate_refills(&state.bag_counts, 1, seed) {
                 let mut central_groups = state.central_groups.clone();
                 central_groups[group_index] = refill.clone();
                 let mut bag_counts = state.bag_counts.clone();
@@ -396,7 +396,7 @@ fn expand_future_state(
                     &state.unseen_cards,
                     catalog,
                     seed,
-                    settings.card_refill_samples,
+                    1,
                 ) {
                     progress.nodes_evaluated += 1;
                     output.push(FutureState {
