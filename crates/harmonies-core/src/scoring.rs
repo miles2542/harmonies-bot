@@ -164,7 +164,7 @@ fn score_spirits(player: &PlayerState, catalog: &CardCatalog) -> i32 {
         .sum()
 }
 
-fn score_spirit_logic(player: &PlayerState, type_arg: u8) -> i32 {
+pub(crate) fn score_spirit_logic(player: &PlayerState, type_arg: u8) -> i32 {
     match type_arg {
         33 => score_color_groups(player, Color::Field, |size| if size >= 3 { 10 } else { 2 }),
         34 => score_color_groups(player, Color::Field, |_| 5),
