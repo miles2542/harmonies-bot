@@ -46,9 +46,9 @@
     `;
     document.documentElement.appendChild(root);
 
-    const visualLayer = document.createElement("div");
-    visualLayer.id = VISUAL_LAYER_ID;
-    document.documentElement.appendChild(visualLayer);
+    const visualLayerEl = document.createElement("div");
+    visualLayerEl.id = VISUAL_LAYER_ID;
+    document.documentElement.appendChild(visualLayerEl);
 
     // Load saved dimensions/position
     const savedX = localStorage.getItem("harmonies-advisor-panel-x");
