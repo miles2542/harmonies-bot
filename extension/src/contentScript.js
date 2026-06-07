@@ -76,9 +76,10 @@
     // Update player and opponent scores
     if (playerId && gamedatas?.players) {
       const user = gamedatas.players[playerId];
-      const userScore = user ? (user.score ?? user.player_score ?? 0) : 0;
-      const opponent = Object.values(gamedatas.players).find(p => String(p.id || p.player_id || p.playerId) !== String(playerId));
-      const opponentScore = opponent ? (opponent.score ?? opponent.player_score ?? 0) : 0;
+      const userScore = user ? Number(user.score ?? user.player_score ?? 0) : 0;
+      const opponentId = Object.keys(gamedatas.players).find(id => String(id) !== String(playerId));
+      const opponent = opponentId ? gamedatas.players[opponentId] : null;
+      const opponentScore = opponent ? Number(opponent.score ?? opponent.player_score ?? 0) : 0;
       overlay.setScores(userScore, opponentScore);
     }
 
