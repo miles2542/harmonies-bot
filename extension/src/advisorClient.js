@@ -199,13 +199,13 @@
         return `${prefix} Place ${labelColor(action.token)} at (${action.col}, ${action.row})`;
       }
       if (action.kind === "draftCard") {
-        return `${prefix} Draft type ${cardTypeArg(action)} card (instance ${cardId(action)})`;
+        return `${prefix} Take card ${cardTypeArg(action)} (instance ID ${cardId(action)}) from river`;
       }
       if (action.kind === "chooseSpirit") {
-        return `${prefix} Choose Spirit type ${cardTypeArg(action)} card (instance ${cardId(action)})`;
+        return `${prefix} Choose Spirit card ${cardTypeArg(action)} (instance ID ${cardId(action)})`;
       }
       if (action.kind === "settleCard") {
-        return `${prefix} Settle type ${cardTypeArg(action)} card cube at (${action.col}, ${action.row})`;
+        return `${prefix} Place cube of card ${cardTypeArg(action)} (instance ID ${cardId(action)}) to (${action.col}, ${action.row})`;
       }
       return `${prefix} ${action.kind}`;
     });

@@ -224,3 +224,207 @@
   pointer-events: none;
   text-align: center;
 }
+
+/* Drag and Resize */
+.harmonies-advisor-header {
+  cursor: move;
+}
+
+.harmonies-advisor-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.harmonies-advisor-auto-analyze-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #d9e2ec;
+  user-select: none;
+  cursor: pointer;
+}
+
+.harmonies-advisor-auto-analyze-label input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.harmonies-advisor-resizer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: se-resize;
+  background: linear-gradient(135deg, transparent 45%, #8795a1 45%, #8795a1 60%, transparent 60%, transparent 80%, #8795a1 80%);
+  border-bottom-right-radius: 7px;
+  z-index: 10000;
+}
+
+/* Score Panel */
+.harmonies-advisor-score-panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  padding: 8px;
+  background: #f0f4f8;
+  border: 1px solid #d9e2ec;
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.score-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.expected-arrow {
+  color: #627d98;
+}
+
+.expected-score {
+  font-weight: 700;
+  color: #0f766e;
+}
+
+.user-score {
+  font-weight: 600;
+}
+
+.opp-score {
+  color: #486581;
+}
+
+/* Steps List Checklist UI */
+.harmonies-advisor-steps-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #d9e2ec;
+  margin-bottom: 6px;
+}
+
+.show-all-steps-btn {
+  padding: 2px 6px;
+  border: 1px solid #bcccdc;
+  border-radius: 4px;
+  background: #fff;
+  color: #627d98;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.show-all-steps-btn.active {
+  background: #0f766e;
+  color: #fff;
+  border-color: #0f766e;
+}
+
+.harmonies-advisor-steps-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+}
+
+.harmonies-advisor-step-item {
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s ease;
+}
+
+.harmonies-advisor-step-item:hover {
+  background: #f0f4f8;
+  color: #102a43;
+}
+
+.harmonies-advisor-step-item.is-active-step {
+  background: #e0f2fe;
+  color: #0369a1;
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px #bae6fd;
+}
+
+/* Collapsible details */
+.harmonies-advisor-plan-alternatives,
+.harmonies-advisor-debug-details {
+  margin-top: 8px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 6px;
+}
+
+.harmonies-advisor-plan-alternatives summary,
+.harmonies-advisor-debug-details summary {
+  font-size: 11px;
+  font-weight: 600;
+  color: #627d98;
+  cursor: pointer;
+  user-select: none;
+}
+
+.harmonies-advisor-debug-content {
+  font-family: monospace;
+  font-size: 11px;
+  color: #486581;
+  padding: 4px;
+  background: #f8fafc;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.harmonies-advisor-debug-content p {
+  margin: 2px 0;
+}
+
+/* Footer Panel Buttons */
+.harmonies-advisor-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #f0f4f8;
+  border-top: 1px solid #d9e2ec;
+  border-radius: 0 0 7px 7px;
+}
+
+.harmonies-advisor-footer-btn {
+  height: 28px;
+  border: 1px solid #bcccdc;
+  border-radius: 4px;
+  background: #fff;
+  color: #334e68;
+  font-weight: 600;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.harmonies-advisor-footer-btn[data-action="analyze"] {
+  background: #0f766e;
+  color: #fff;
+  border-color: #0f766e;
+}
+
+.harmonies-advisor-footer-btn[data-action="stop"] {
+  background: #ef4444;
+  color: #fff;
+  border-color: #ef4444;
+}
+
+.harmonies-advisor-footer-btn[data-action="freeze"].is-active-frozen {
+  background: #f97316;
+  color: #fff;
+  border-color: #f97316;
+}
+
+/* Visual frozen layout indicator */
+#harmonies-advisor-root.is-plan-frozen {
+  border-color: #f97316;
+  box-shadow: 0 12px 36px rgba(249, 115, 22, 0.25);
+}

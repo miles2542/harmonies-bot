@@ -8,6 +8,7 @@
   let isAnalyzing = false;
   let activeStateKey = "";
   let activeRunId = 0;
+  let lastAutoAnalyzedStateKey = "";
   overlay.onAnalyze(() => {
     handleAnalyzeClick().catch((error) => {
       activeRunId += 1;
@@ -68,8 +69,20 @@
       overlay.setStatus("Waiting for Harmonies table");
       return;
     }
+
+    const perspective = resolveAnalysisPerspective(gamedatas, latestPayload);
+    const playerId = perspective.playerId || getCurrentPlayerId(gamedatas, latestPayload);
+
+    // Update player and opponent scores
+    if (playerId && gamedatas?.players) {
+      const user = gamedatas.players[playerId];
+      const userScore = user ? (user.score ?? user.player_score ?? 0) : 0;
+      const opponent = Object.values(gamedatas.players).find(p => String(p.id || p.player_id || p.playerId) !== String(playerId));
+      const opponentScore = opponent ? (opponent.score ?? opponent.player_score ?? 0) : 0;
+      overlay.setScores(userScore, opponentScore);
+    }
+
     if (!isAnalyzing && !activeStateKey) {
-      const perspective = resolveAnalysisPerspective(gamedatas, latestPayload);
       overlay.setStatus(
         perspective.playerId
           ? `Ready to analyze ${perspective.label}`
@@ -77,6 +90,22 @@
             ? perspective.reason
           : "Waiting for active player state",
       );
+    }
+
+    // Auto-Analyze trigger when auto-analyze is enabled and it is our turn
+    if (perspective.playerId && perspective.mode === "participant" && overlay.isAutoAnalyzeEnabled() && !isAnalyzing) {
+      const visibleStateV1 = window.HarmoniesVisibleStateReader.readVisibleState(gamedatas, perspective.playerId);
+      const stateKey = buildStateKey(gamedatas, perspective.playerId, visibleStateV1);
+      if (stateKey && stateKey !== lastAutoAnalyzedStateKey) {
+        lastAutoAnalyzedStateKey = stateKey;
+        handleAnalyzeClick().catch((error) => {
+          activeRunId += 1;
+          isAnalyzing = false;
+          activeStateKey = "";
+          overlay.setAnalyzeLabel("Retry");
+          overlay.setStatus(`Advisor error: ${error.message}`);
+        });
+      }
     }
   }
 
