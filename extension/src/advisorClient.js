@@ -167,6 +167,7 @@
             utilityEstimate: best.utilityEstimate ?? best.scoreEstimate ?? 0,
             futureEstimate: best.scoreEstimate ?? 0,
             denialEstimate: best.opponentDenialEstimate ?? 0,
+            immediateTotal: getImmediateTotal(best.scoreBreakdown),
             actions: best.orderedActions || [],
             steps: actionSteps(best).concat(scoreSteps(best)),
           }
@@ -211,16 +212,22 @@
     });
   }
 
-  function scoreSteps(move) {
-    const breakdown = move.scoreBreakdown || {};
-    const immediateTotal =
+  function getImmediateTotal(breakdown) {
+    if (!breakdown) return 0;
+    return (
       (breakdown.trees || 0) +
       (breakdown.mountains || 0) +
       (breakdown.fields || 0) +
       (breakdown.buildings || 0) +
       (breakdown.water || 0) +
       (breakdown.animals || 0) +
-      (breakdown.spirits || 0);
+      (breakdown.spirits || 0)
+    );
+  }
+
+  function scoreSteps(move) {
+    const breakdown = move.scoreBreakdown || {};
+    const immediateTotal = getImmediateTotal(breakdown);
     return [
       `Search estimate: future self ${move.scoreEstimate || 0} VP, denial ${move.opponentDenialEstimate || 0}, utility ${
         move.utilityEstimate || move.scoreEstimate || 0

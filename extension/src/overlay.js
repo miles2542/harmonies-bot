@@ -217,7 +217,7 @@
         }
 
         // Expected score update
-        root.querySelector(".expected-score").textContent = `${bestMove.futureEstimate} VP`;
+        root.querySelector(".expected-score").textContent = `${bestMove.immediateTotal} VP`;
 
         // We only render one unified best plan
         const plan = {
