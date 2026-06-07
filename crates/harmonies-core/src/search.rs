@@ -336,6 +336,7 @@ fn future_value(
     progress: &mut SearchProgress,
     tt: &cache::TranspositionTable,
 ) -> i32 {
+    let initial_score = initial.score;
     let initial_hash = cache::hash_future_state(&initial);
     if let Some(cached) = tt.lookup(initial_hash, depth_remaining) {
         return cached;
@@ -402,7 +403,11 @@ fn future_value(
         }
         next.sort_by(|left, right| right.score.cmp(&left.score));
         next.truncate(settings.future_branch_width);
-        best = best.max(next[0].score);
+        // Discount the score improvement (gain) over the initial root state to favor immediate scores
+        let gain = next[0].score - initial_score;
+        let discount = 0.85f64;
+        let discounted_score = initial_score + (gain as f64 * discount.powi(depth as i32 + 1)).round() as i32;
+        best = best.max(discounted_score);
         frontier = next;
     }
     
