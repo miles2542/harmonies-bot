@@ -62,6 +62,29 @@
     return Boolean(playerId && players[playerId]);
   }
 
+  function getDomPlayerScore(playerId) {
+    if (!playerId) return null;
+    let node = document.getElementById(`player_score_${playerId}`) ||
+               document.getElementById(`player_score_val_${playerId}`) ||
+               document.querySelector(`[id*='score'][id*='${playerId}']`);
+    if (node) {
+      const val = parseInt(node.textContent.trim(), 10);
+      if (Number.isInteger(val)) return val;
+    }
+    const panel = document.getElementById(`player_board_${playerId}`) || 
+                  document.getElementById(`player-board-${playerId}`) || 
+                  document.querySelector(`[id*='player_board'][id*='${playerId}']`) ||
+                  document.querySelector(`[id*='player-table'][id*='${playerId}']`);
+    if (panel) {
+      const scoreNodes = panel.querySelectorAll("[class*='score'], [id*='score']");
+      for (const sn of scoreNodes) {
+        const val = parseInt(sn.textContent.trim(), 10);
+        if (Number.isInteger(val)) return val;
+      }
+    }
+    return null;
+  }
+
   function handleState(payload) {
     latestPayload = payload || null;
     const gamedatas = latestPayload?.gamedatas;
@@ -75,12 +98,21 @@
 
     // Update player and opponent scores
     if (playerId && gamedatas?.players) {
-      const user = gamedatas.players[playerId];
-      const userScore = user ? Number(user.score ?? user.player_score ?? 0) : 0;
       const opponentId = Object.keys(gamedatas.players).find(id => String(id) !== String(playerId));
-      const opponent = opponentId ? gamedatas.players[opponentId] : null;
-      const opponentScore = opponent ? Number(opponent.score ?? opponent.player_score ?? 0) : 0;
-      overlay.setScores(userScore, opponentScore);
+
+      let userScore = getDomPlayerScore(playerId);
+      let opponentScore = opponentId ? getDomPlayerScore(opponentId) : null;
+
+      if (userScore === null) {
+        const user = gamedatas.players[playerId];
+        userScore = user ? Number(user.score ?? user.player_score ?? 0) : 0;
+      }
+      if (opponentScore === null && opponentId) {
+        const opponent = gamedatas.players[opponentId];
+        opponentScore = opponent ? Number(opponent.score ?? opponent.player_score ?? 0) : 0;
+      }
+
+      overlay.setScores(userScore, opponentScore || 0);
     }
 
     if (!isAnalyzing && !activeStateKey) {
