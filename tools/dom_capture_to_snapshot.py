@@ -525,7 +525,7 @@ def convert_visible_state(capture: dict[str, object]) -> dict[str, object] | Non
             "emptyHexes": empty_hexes(cells),
         })
     if not players:
-        raise SystemExit("visibleStateV1 has no players")
+        return None
     central_token_groups = visible_central_groups(visible.get("centralTokenGroups"))
     return {
         "schemaVersion": 1,
