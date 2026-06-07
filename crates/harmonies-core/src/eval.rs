@@ -135,7 +135,9 @@ pub fn calculate_completion_proximity(player: &PlayerState, catalog: &CardCatalo
             if let Some(def) = catalog.get(card.type_arg) {
                 let total = def.point_locations.len() as f64;
                 if total > 0.0 {
-                    (total - card.remaining_cubes as f64).max(0.0)
+                    let progress = (total - card.remaining_cubes as f64).max(0.0);
+                    // Add constant bonus of 0.5 to reward holding active cards in hand
+                    progress + 0.5
                 } else {
                     0.0
                 }
@@ -217,7 +219,8 @@ pub fn eval_spirits(
                 } else {
                     (empty_hexes - thresh) / (20.0 - thresh)
                 };
-                multiplier * (potential_score + w_spirit_offset)
+                // Scale incomplete spirit value by 0.80 to incentivize actual completion
+                0.80 * multiplier * (potential_score + w_spirit_offset)
             }
         })
         .sum()
