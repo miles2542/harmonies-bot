@@ -12,6 +12,65 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+
+def generate_turn0_snapshot() -> dict[str, Any]:
+    cells = []
+    for col in range(5):
+        for row in range(5):
+            cells.append({
+                "coord": {"col": col, "row": row},
+                "stack": {"tokens": []},
+                "lockedByCube": False
+            })
+    return {
+        "schemaVersion": 1,
+        "perspectivePlayerId": "player_1",
+        "activePlayerId": "player_1",
+        "boardSide": "sideA",
+        "players": [
+            {
+                "playerId": "player_1",
+                "cells": cells,
+                "activeCards": [],
+                "spiritCardChoices": [],
+                "completedCards": [],
+                "emptyHexes": 25
+            },
+            {
+                "playerId": "player_2",
+                "cells": [dict(c) for c in cells],
+                "activeCards": [],
+                "spiritCardChoices": [],
+                "completedCards": [],
+                "emptyHexes": 25
+            }
+        ],
+        "centralTokenGroups": [
+            ["foliage", "water", "mountain"],
+            ["foliage", "trunk", "field"],
+            ["mountain", "trunk", "foliage"],
+            ["water", "field", "mountain"],
+            ["water", "water", "building"]
+        ],
+        "riverCards": [
+            {"cardId": 1, "typeArg": 1, "remainingCubes": 3, "isSpirit": False},
+            {"cardId": 2, "typeArg": 2, "remainingCubes": 3, "isSpirit": False},
+            {"cardId": 3, "typeArg": 3, "remainingCubes": 3, "isSpirit": False},
+            {"cardId": 4, "typeArg": 4, "remainingCubes": 3, "isSpirit": False},
+            {"cardId": 5, "typeArg": 5, "remainingCubes": 3, "isSpirit": False}
+        ],
+        "bagCounts": {
+            "water": 23,
+            "mountain": 23,
+            "trunk": 21,
+            "foliage": 19,
+            "field": 19,
+            "building": 15,
+            "unknown": 0
+        },
+        "cardsCatalogVersion": "bga"
+    }
+
 # Define the tuning bounds for all parameters
 PARAM_BOUNDS: dict[str, tuple[int, int]] = {
     "opponentDenialPercent": (0, 200),
@@ -94,6 +153,11 @@ def run_single_game(
     turn_budget_ms: int,
     max_turns: int,
     temp_dir: Path,
+    rayon_threads: int,
+    root_beam: int,
+    future_beam: int,
+    future_branch: int,
+    future_depth: int,
 ) -> tuple[float, float, float, float]:
     """
     Run a single self-play game between candidate and opponent.
@@ -129,7 +193,13 @@ def run_single_game(
             "--validated-scorer",
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        env = os.environ.copy()
+        env["RAYON_NUM_THREADS"] = str(rayon_threads)
+        env["HARMONIES_ROOT_BEAM"] = str(root_beam)
+        env["HARMONIES_FUTURE_BEAM"] = str(future_beam)
+        env["HARMONIES_FUTURE_BRANCH"] = str(future_branch)
+        env["HARMONIES_FUTURE_DEPTH"] = str(future_depth)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, env=env)
         report: dict[str, Any] = json.loads(result.stdout)
 
         final_scores: list[dict[str, Any]] = report.get("finalScores", [])
@@ -171,6 +241,11 @@ def evaluate_candidate(
     max_turns: int,
     temp_dir: Path,
     parallelism: int,
+    rayon_threads: int,
+    root_beam: int,
+    future_beam: int,
+    future_branch: int,
+    future_depth: int,
     start_seed: int = 1000,
 ) -> tuple[float, float, float, float]:
     """
@@ -197,6 +272,11 @@ def evaluate_candidate(
                     turn_budget_ms,
                     max_turns,
                     temp_dir,
+                    rayon_threads,
+                    root_beam,
+                    future_beam,
+                    future_branch,
+                    future_depth,
                 )
             )
 
@@ -230,16 +310,21 @@ def build_binary() -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run SPSA tuning tournament for overnight weights optimization.")
     parser.add_argument("--baseline", type=Path, default=Path("docs/weights.baseline.json"))
-    parser.add_argument("--fixture", type=Path, default=Path("fixtures/advisor_requests/sidea_2p_nature_match12_early_spirit_choice_request.json"))
+    parser.add_argument("--fixture", type=str, default="turn0", help="Path to AdvisorRequestV1 JSON fixture, or 'turn0' to generate a fresh game.")
     parser.add_argument("--log-dir", type=Path, default=Path("logs/tuning"))
     parser.add_argument("--temp-dir", type=Path, default=Path("temp/tuning"))
     parser.add_argument("--games-per-eval", type=int, default=40, help="Number of games to evaluate a perturbed candidate (must be even).")
     parser.add_argument("--turn-budget-ms", type=int, default=20, help="Turn budget limit in milliseconds for fast simulations.")
     parser.add_argument("--max-turns", type=int, default=80)
     parser.add_argument("--iterations", type=int, default=500)
-    parser.add_argument("--a", type=float, default=25.0, help="SPSA step scale a (parameter update factor)")
-    parser.add_argument("--c", type=float, default=4.0, help="SPSA perturbation step size c")
+    parser.add_argument("--a", type=float, default=20000.0, help="SPSA step scale a (parameter update factor)")
+    parser.add_argument("--c", type=float, default=15.0, help="SPSA perturbation step size c")
     parser.add_argument("--parallelism", type=int, default=max(1, (os.cpu_count() or 4) - 1))
+    parser.add_argument("--rayon-threads", type=int, default=2, help="Number of Rayon threads per game to prevent CPU over-subscription.")
+    parser.add_argument("--root-beam", type=int, default=64, help="Beam width for turn candidate generation at root.")
+    parser.add_argument("--future-beam", type=int, default=16, help="Beam width during lookahead simulation.")
+    parser.add_argument("--future-branch", type=int, default=8, help="Branching width for expanding future states.")
+    parser.add_argument("--future-depth", type=int, default=4, help="Maximum search depth for lookahead.")
     args = parser.parse_args()
 
     # Compile native binary first
@@ -249,8 +334,16 @@ def main() -> None:
     args.log_dir.mkdir(parents=True, exist_ok=True)
     args.temp_dir.mkdir(parents=True, exist_ok=True)
 
-    log_file: Path = args.log_dir / f"tuning_run_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl"
-    snapshot_path = extract_snapshot(args.fixture, args.temp_dir)
+    run_id = f"run_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    run_dir = args.log_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    log_file: Path = run_dir / "tuning.jsonl"
+    if args.fixture == "turn0":
+        snapshot_path = args.temp_dir / "turn0_snapshot.json"
+        turn0_data = generate_turn0_snapshot()
+        snapshot_path.write_text(json.dumps(turn0_data, indent=2) + "\n", encoding="utf-8")
+    else:
+        snapshot_path = extract_snapshot(Path(args.fixture), args.temp_dir)
 
     print(f"Loading baseline weights from {args.baseline}...")
     baseline = load_weights(args.baseline)
@@ -274,6 +367,11 @@ def main() -> None:
         args.max_turns,
         args.temp_dir,
         args.parallelism,
+        args.rayon_threads,
+        args.root_beam,
+        args.future_beam,
+        args.future_branch,
+        args.future_depth,
         start_seed=1000,
     )
     print(f"Baseline vs Baseline: Win Rate = {base_wr:.2%}, Margin = {base_margin:.2f} (Avg Scores: {base_cand:.1f} vs {base_opp:.1f})")
@@ -319,6 +417,11 @@ def main() -> None:
                 args.max_turns,
                 args.temp_dir,
                 args.parallelism,
+                args.rayon_threads,
+                args.root_beam,
+                args.future_beam,
+                args.future_branch,
+                args.future_depth,
                 start_seed=eval_seed,
             )
 
@@ -332,6 +435,11 @@ def main() -> None:
                 args.max_turns,
                 args.temp_dir,
                 args.parallelism,
+                args.rayon_threads,
+                args.root_beam,
+                args.future_beam,
+                args.future_branch,
+                args.future_depth,
                 start_seed=eval_seed,
             )
 
@@ -375,6 +483,11 @@ def main() -> None:
             with log_file.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(log_entry) + "\n")
 
+            # Save intermediate checkpoints
+            save_weights(run_dir / "weights_current.json", current_best)
+            if k % 20 == 0:
+                save_weights(run_dir / f"weights_checkpoint_iter_{k:03d}.json", current_best)
+
             print(
                 f"Iteration {k:03d} | wr+: {wr_plus:.2%}, wr-: {wr_minus:.2%} | "
                 f"Plus Scores: {cand_plus:.1f} vs {opp_plus:.1f} | "
@@ -385,9 +498,12 @@ def main() -> None:
         print("\n[Ctrl+C] Stopping early. Saving current best weights...", flush=True)
 
     # Save final optimized weights
-    final_path = Path("docs/weights.optimized.json")
-    save_weights(final_path, current_best)
-    print(f"Optimized weights saved to {final_path}!")
+    run_weights_path = run_dir / "weights_optimized.json"
+    save_weights(run_weights_path, current_best)
+
+    default_path = Path("docs/weights.optimized.json")
+    save_weights(default_path, current_best)
+    print(f"Optimized weights saved to {run_weights_path} and copy placed at {default_path}!")
 
 
 if __name__ == "__main__":

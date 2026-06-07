@@ -10,6 +10,7 @@ pub(super) struct SearchSettings {
     pub card_refill_samples: usize,
     pub hard_stop_margin_ms: u64,
     pub min_future_expand_ms: u64,
+    pub transposition_table_size_power_of_two: usize,
 }
 
 impl Default for SearchSettings {
@@ -21,8 +22,9 @@ impl Default for SearchSettings {
             future_depth: 4,
             refill_samples: 10,
             card_refill_samples: 4,
-            hard_stop_margin_ms: 6_000,
-            min_future_expand_ms: 7_000,
+            hard_stop_margin_ms: 10,
+            min_future_expand_ms: 15,
+            transposition_table_size_power_of_two: 20,
         }
     }
 }
@@ -50,6 +52,10 @@ impl SearchSettings {
             min_future_expand_ms: env_u64(
                 "HARMONIES_MIN_FUTURE_EXPAND_MS",
                 defaults.min_future_expand_ms,
+            ),
+            transposition_table_size_power_of_two: env_usize(
+                "HARMONIES_TT_SIZE",
+                defaults.transposition_table_size_power_of_two,
             ),
         }
     }

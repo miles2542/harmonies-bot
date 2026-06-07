@@ -28,7 +28,7 @@ pub struct TranspositionTable {
 
 impl TranspositionTable {
     pub fn new(size_power_of_two: usize) -> Self {
-        let size = size_power_of_two.next_power_of_two();
+        let size = 1usize << size_power_of_two;
         let mut table = Vec::with_capacity(size);
         for _ in 0..size {
             table.push(TranspositionEntry::default());

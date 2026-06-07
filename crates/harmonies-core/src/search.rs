@@ -84,7 +84,7 @@ pub fn search_current_player_turn_with_progress(
         });
     }
 
-    let tt = cache::TranspositionTable::new(23);
+    let tt = cache::TranspositionTable::new(settings.transposition_table_size_power_of_two);
     for depth in 1..=settings.future_depth {
         if progress.stopped_early || should_cancel() || Instant::now() >= deadline {
             progress.stopped_early = true;
