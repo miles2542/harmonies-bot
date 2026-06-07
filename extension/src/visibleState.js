@@ -219,7 +219,18 @@
   function domCubeInCell(cell) {
     const rect = cell.getBoundingClientRect();
     return Array.from(document.querySelectorAll(".animal-cube, [class*='animal-cube']")).some(
-      (node) => isVisibleElement(node) && rectContainsCenter(rect, node.getBoundingClientRect()),
+      (node) => {
+        if (!isVisibleElement(node)) return false;
+        const cubeRect = node.getBoundingClientRect();
+        const center_x = cubeRect.left + cubeRect.width / 2;
+        const center_y = cubeRect.top + cubeRect.height / 2;
+        return (
+          center_x >= rect.left &&
+          center_x <= rect.right &&
+          center_y >= rect.top - 65 &&
+          center_y <= rect.top + rect.height * 0.6
+        );
+      }
     );
   }
 

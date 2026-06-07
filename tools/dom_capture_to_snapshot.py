@@ -197,6 +197,127 @@ def cells_for_player(nodes: list[DomNode], player_id: str) -> list[dict[str, obj
     return result
 
 
+def cells_from_gamedatas(data: dict[str, Any], player_id: str) -> list[dict[str, object]]:
+    COLOR_BY_TYPE_ARG = {
+        1: "water",
+        2: "mountain",
+        3: "trunk",
+        4: "foliage",
+        5: "field",
+        6: "building",
+        7: "building",
+    }
+    gamedatas = as_object(data.get("gamedatas", data))
+    players = as_object(gamedatas.get("players", {}))
+    player = as_object(players.get(player_id, {}))
+    
+    tokens_map = as_object(player.get("tokensOnBoard", {}))
+    cubes_map = as_object(player.get("animalCubesOnBoard", {}))
+    
+    result = []
+    for row in range(5):
+        for col in range(5):
+            cell_key = f"cell_{player_id}_{col}_{row}"
+            # Extract tokens
+            raw_tokens = as_list(tokens_map.get(cell_key))
+            # Sort raw_tokens by location_arg (level)
+            sorted_tokens = sorted(raw_tokens, key=lambda t: number_value(as_object(t).get("location_arg")))
+            tokens = []
+            for t in sorted_tokens:
+                color_id = number_value(as_object(t).get("type_arg"))
+                color_name = COLOR_BY_TYPE_ARG.get(color_id)
+                if color_name:
+                    tokens.append(color_name)
+            
+            # Extract lockedByCube
+            raw_cubes = as_list(cubes_map.get(cell_key))
+            locked = len(raw_cubes) > 0
+            
+            result.append({
+                "coord": {"col": col, "row": row},
+                "stack": {"tokens": tokens},
+                "lockedByCube": locked
+            })
+    return sorted(
+        result,
+        key=lambda cell: (
+            int(as_object(cell["coord"]).get("row") or 0),
+            int(as_object(cell["coord"]).get("col") or 0),
+        ),
+    )
+
+
+def river_cards_from_gamedatas(data: dict[str, Any]) -> list[dict[str, object]]:
+    gamedatas = as_object(data.get("gamedatas", data))
+    raw_river = as_list(gamedatas.get("river", []))
+    catalog_cube_counts = catalog_cube_count_by_type_arg()
+    result = []
+    for raw in raw_river:
+        card = as_object(raw)
+        card_id = int(number_value(card.get("id")))
+        type_arg = int(number_value(card.get("type_arg")))
+        is_spirit = bool_value(card.get("isSpirit"))
+        max_cubes = catalog_cube_counts.get(type_arg, 0)
+        result.append({
+            "cardInstanceId": card_id,
+            "cardId": card_id,
+            "typeArg": type_arg,
+            "isSpirit": is_spirit,
+            "remainingCubes": max_cubes,
+        })
+    return sorted(result, key=lambda c: c["cardId"])
+
+
+def spirit_choices_from_gamedatas(data: dict[str, Any]) -> list[dict[str, object]]:
+    gamedatas = as_object(data.get("gamedatas", data))
+    raw_spirits = as_list(gamedatas.get("spiritsCards", []))
+    catalog_cube_counts = catalog_cube_count_by_type_arg()
+    result = []
+    for raw in raw_spirits:
+        card = as_object(raw)
+        card_id = int(number_value(card.get("id")))
+        type_arg = int(number_value(card.get("type_arg")))
+        is_spirit = bool_value(card.get("isSpirit"))
+        max_cubes = catalog_cube_counts.get(type_arg, 0)
+        result.append({
+            "cardInstanceId": card_id,
+            "cardId": card_id,
+            "typeArg": type_arg,
+            "isSpirit": is_spirit,
+            "remainingCubes": max_cubes,
+        })
+    return sorted(result, key=lambda c: c["cardId"])
+
+
+def cards_from_gamedatas(data: dict[str, Any], player_id: str, key: str) -> list[dict[str, object]]:
+    gamedatas = as_object(data.get("gamedatas", data))
+    players = as_object(gamedatas.get("players", {}))
+    player = as_object(players.get(player_id, {}))
+    raw_cards = as_list(player.get(key, []))
+    cubes_list = as_list(gamedatas.get("cubesOnAnimalCards", []))
+    result = []
+    for raw in raw_cards:
+        card = as_object(raw)
+        card_id = int(number_value(card.get("id")))
+        type_arg = int(number_value(card.get("type_arg")))
+        is_spirit = bool_value(card.get("isSpirit"))
+        prefix = f"card_{card_id}"
+        remaining = sum(
+            1 for c in cubes_list
+            if string_value(as_object(c).get("location")) == prefix
+        )
+        if key == "doneAnimalCards":
+            remaining = 0
+        result.append({
+            "cardInstanceId": card_id,
+            "cardId": card_id,
+            "typeArg": type_arg,
+            "isSpirit": is_spirit,
+            "remainingCubes": remaining,
+        })
+    return sorted(result, key=lambda c: c["cardId"])
+
+
 def cell_sort_key(node_id: str) -> tuple[int, int]:
     match = CELL_RE.match(node_id)
     if not match:
@@ -218,10 +339,23 @@ def tokens_in_cell(nodes: list[DomNode], cell: DomNode) -> list[str]:
 
 
 def cube_in_cell(nodes: list[DomNode], cell: DomNode) -> bool:
-    return any(
-        "animal-cube" in node.class_name and center_inside(cell.rect, node.rect)
-        for node in nodes
-    )
+    outer = cell.rect
+    if outer.width <= 0 or outer.height <= 0:
+        return False
+    for node in nodes:
+        if "animal-cube" not in node.class_name:
+            continue
+        inner = node.rect
+        if inner.width <= 0 or inner.height <= 0:
+            continue
+        center_x = inner.x + inner.width / 2
+        center_y = inner.y + inner.height / 2
+        if (
+            outer.x <= center_x <= outer.x + outer.width
+            and outer.y - 65 <= center_y <= outer.y + outer.height * 0.6
+        ):
+            return True
+    return False
 
 
 def catalog_cube_count_by_type_arg(path: Path = CARD_CATALOG_PATH) -> dict[int, int]:
@@ -558,26 +692,42 @@ def convert_dom_snapshot(data: dict[str, Any]) -> dict[str, object]:
     catalog_cube_counts = catalog_cube_count_by_type_arg()
     for player_id in ids:
         cells = cells_for_player(nodes, player_id)
+        if all(len(as_list(as_object(c.get("stack")).get("tokens"))) == 0 for c in cells):
+            cells = cells_from_gamedatas(data, player_id)
+            
+        active_cards = cards_for_player(
+            nodes,
+            player_id,
+            "hand",
+            completed=False,
+            card_point_counts=card_point_counts,
+            catalog_cube_counts=catalog_cube_counts,
+        )
+        if not active_cards:
+            active_cards = cards_from_gamedatas(data, player_id, "boardAnimalCards")
+            
+        completed_cards = cards_for_player(
+            nodes,
+            player_id,
+            "done",
+            completed=True,
+            card_point_counts=card_point_counts,
+            catalog_cube_counts=catalog_cube_counts,
+        )
+        if not completed_cards:
+            completed_cards = cards_from_gamedatas(data, player_id, "doneAnimalCards")
+            
+        spirit_choices = []
+        if not active_cards:
+            spirit_choices = spirit_choices_from_gamedatas(data)
+            
         players.append(
             {
                 "playerId": player_id,
                 "cells": cells,
-                "activeCards": cards_for_player(
-                    nodes,
-                    player_id,
-                    "hand",
-                    completed=False,
-                    card_point_counts=card_point_counts,
-                    catalog_cube_counts=catalog_cube_counts,
-                ),
-                "completedCards": cards_for_player(
-                    nodes,
-                    player_id,
-                    "done",
-                    completed=True,
-                    card_point_counts=card_point_counts,
-                    catalog_cube_counts=catalog_cube_counts,
-                ),
+                "activeCards": active_cards,
+                "spiritCardChoices": spirit_choices,
+                "completedCards": completed_cards,
                 "emptyHexes": empty_hexes(cells),
             }
         )
@@ -585,6 +735,25 @@ def convert_dom_snapshot(data: dict[str, Any]) -> dict[str, object]:
         raise SystemExit("no player-table DOM nodes found")
     active_player_id = active_player_id_from_capture(data, ids)
     central_token_groups = central_groups(nodes)
+    
+    if not any(central_token_groups):
+        gamedatas = as_object(data.get("gamedatas", data))
+        raw_board_groups = as_object(gamedatas.get("tokensOnCentralBoard", {}))
+        central_token_groups = []
+        for hole_id in sorted(raw_board_groups.keys(), key=int):
+            group_tokens = as_list(raw_board_groups[hole_id])
+            tokens = []
+            for t in group_tokens:
+                color_id = number_value(as_object(t).get("type_arg"))
+                color_name = COLOR_BY_CLASS.get(str(color_id))
+                if color_name:
+                    tokens.append(color_name)
+            central_token_groups.append(tokens)
+            
+    river = river_cards(nodes, card_point_counts, catalog_cube_counts)
+    if not river:
+        river = river_cards_from_gamedatas(data)
+        
     return {
         "schemaVersion": 1,
         "perspectivePlayerId": active_player_id,
@@ -592,7 +761,7 @@ def convert_dom_snapshot(data: dict[str, Any]) -> dict[str, object]:
         "boardSide": board_side(nodes),
         "players": players,
         "centralTokenGroups": central_token_groups,
-        "riverCards": river_cards(nodes, card_point_counts, catalog_cube_counts),
+        "riverCards": river,
         "bagCounts": infer_bag_counts(data, players, central_token_groups),
         "cardsCatalogVersion": "dom-capture",
     }

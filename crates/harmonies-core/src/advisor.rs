@@ -60,29 +60,33 @@ pub struct MovePlanV1 {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(
     rename_all = "camelCase",
-    rename_all_fields = "camelCase",
     tag = "kind"
 )]
 pub enum MoveActionV1 {
+    #[serde(rename_all = "camelCase")]
     TakeGroup {
         group_index: usize,
         tokens: Vec<Color>,
     },
+    #[serde(rename_all = "camelCase")]
     PlaceToken {
         token: Color,
         col: i8,
         row: i8,
     },
+    #[serde(rename_all = "camelCase")]
     SettleCard {
         card_id: u32,
         type_arg: u8,
         col: i8,
         row: i8,
     },
+    #[serde(rename_all = "camelCase")]
     DraftCard {
         card_id: u32,
         type_arg: u8,
     },
+    #[serde(rename_all = "camelCase")]
     ChooseSpirit {
         card_id: u32,
         type_arg: u8,

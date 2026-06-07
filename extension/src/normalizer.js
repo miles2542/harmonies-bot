@@ -91,7 +91,7 @@
       const lockedByCube = Boolean((key && playerCubeLocations.has(key)) || playerCubeCoords.has(coordKey));
       return {
         coord,
-        stack: { tokens: domCell ? domCell.tokens : key ? tokenStacks.get(key) || [] : [] },
+        stack: { tokens: (domCell && domCell.tokens && domCell.tokens.length > 0) ? domCell.tokens : (key ? tokenStacks.get(key) || [] : []) },
         lockedByCube: lockedByCube || Boolean(domCell?.lockedByCube),
       };
     });

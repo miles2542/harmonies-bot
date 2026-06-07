@@ -330,6 +330,7 @@
           const card = findCard(action);
           if (card) {
             addRectOverlay(card, "harmonies-advisor-card-ring");
+            addCardStepMarker(card, String(selectedStepIndex + 1), action.kind);
           }
         } else if (action.kind === "settleCard") {
           const cell = findBoardCell(bestMove.playerId, action.col, action.row);
@@ -364,17 +365,25 @@
       }
       (bestMove.actions || []).forEach((action, index) => {
         if (activeIndex !== null && activeIndex !== index) return;
-        if (!["placeToken", "settleCard"].includes(action.kind)) {
-          return;
-        }
-        const cell = findBoardCell(playerId, action.col, action.row);
-        if (!cell) {
-          return;
-        }
-        addRectOverlay(cell, "harmonies-advisor-cell-ring");
-        addStepMarker(cell, String(index + 1), action.kind);
-        if (action.kind === "settleCard") {
-          drawSettlementLink(action, cell);
+        if (action.kind === "placeToken") {
+          const cell = findBoardCell(playerId, action.col, action.row);
+          if (cell) {
+            addRectOverlay(cell, "harmonies-advisor-cell-ring");
+            addStepMarker(cell, String(index + 1), action.kind);
+          }
+        } else if (action.kind === "settleCard") {
+          const cell = findBoardCell(playerId, action.col, action.row);
+          if (cell) {
+            addRectOverlay(cell, "harmonies-advisor-cell-ring");
+            addStepMarker(cell, String(index + 1), action.kind);
+            drawSettlementLink(action, cell);
+          }
+        } else if (action.kind === "draftCard" || action.kind === "chooseSpirit") {
+          const card = findCard(action);
+          if (card) {
+            addRectOverlay(card, "harmonies-advisor-card-ring");
+            addCardStepMarker(card, String(index + 1), action.kind);
+          }
         }
       });
     }
@@ -435,6 +444,20 @@
       marker.dataset.kind = kind;
       marker.textContent = label;
       marker.style.left = `${rect.left + window.scrollX + rect.width - 16}px`;
+      marker.style.top = `${rect.top + window.scrollY + 4}px`;
+      visualLayer().appendChild(marker);
+    }
+
+    function addCardStepMarker(card, label, kind) {
+      const rect = card.getBoundingClientRect();
+      if (!isVisibleRect(rect)) {
+        return;
+      }
+      const marker = document.createElement("span");
+      marker.className = "harmonies-advisor-step-marker";
+      marker.dataset.kind = kind;
+      marker.textContent = label;
+      marker.style.left = `${rect.left + window.scrollX + rect.width - 24}px`;
       marker.style.top = `${rect.top + window.scrollY + 4}px`;
       visualLayer().appendChild(marker);
     }
