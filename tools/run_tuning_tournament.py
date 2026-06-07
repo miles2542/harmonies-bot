@@ -67,6 +67,23 @@ def extract_snapshot(fixture_path: Path, temp_dir: Path) -> Path:
     raise ValueError(f"{fixture_path} is neither AdvisorRequestV1 nor GameSnapshotV1")
 
 
+def safe_unlink(path: Path) -> None:
+    """Safely delete a file, retrying on Windows locking issues, and ignoring errors if they persist."""
+    if not path.exists():
+        return
+    for _ in range(5):
+        try:
+            path.unlink()
+            return
+        except PermissionError:
+            import time
+            time.sleep(0.05)
+        except Exception:
+            break
+    # If still fails, just warn and move on; don't crash SPSA
+    print(f"Warning: Could not delete temporary file {path}", file=sys.stderr)
+
+
 def run_single_game(
     cli_path: Path,
     snapshot_path: Path,
@@ -140,10 +157,8 @@ def run_single_game(
         return 0.0, 0.0, 0.0, 0.0
     finally:
         # Cleanup
-        if candidate_file.exists():
-            candidate_file.unlink()
-        if opponent_file.exists():
-            opponent_file.unlink()
+        safe_unlink(candidate_file)
+        safe_unlink(opponent_file)
 
 
 def evaluate_candidate(
