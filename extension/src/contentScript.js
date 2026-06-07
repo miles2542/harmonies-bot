@@ -96,8 +96,8 @@
     const perspective = resolveAnalysisPerspective(gamedatas, latestPayload);
     const playerId = perspective.playerId || getCurrentPlayerId(gamedatas, latestPayload);
 
-    // Update player and opponent scores
-    if (playerId && gamedatas?.players) {
+    // Update player and opponent scores at game end
+    if (isGameEnd(gamedatas) && playerId && gamedatas?.players) {
       const opponentId = Object.keys(gamedatas.players).find(id => String(id) !== String(playerId));
 
       let userScore = getDomPlayerScore(playerId);

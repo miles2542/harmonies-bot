@@ -33,6 +33,8 @@ pub struct AdvisorResponseV1 {
     pub best_moves: Vec<MovePlanV1>,
     pub progress: SearchProgress,
     pub warnings: Vec<String>,
+    #[serde(default)]
+    pub initial_scores: std::collections::HashMap<String, i32>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -106,6 +108,16 @@ pub fn advise_with_progress_and_cancel(
     let started = Instant::now();
     let mut warnings = Vec::new();
 
+    let initial_scores: std::collections::HashMap<String, i32> = request
+        .snapshot
+        .players
+        .iter()
+        .map(|p| {
+            let score = crate::scoring::score_player(p, request.snapshot.board_side, &request.catalog).total();
+            (p.player_id.clone(), score)
+        })
+        .collect();
+
     if request.snapshot.active_player_id != request.snapshot.perspective_player_id {
         return AdvisorResponseV1 {
             status: AdvisorStatus::NotParticipantTurn,
@@ -113,6 +125,7 @@ pub fn advise_with_progress_and_cancel(
             best_moves: Vec::new(),
             progress: SearchProgress::default(),
             warnings,
+            initial_scores,
         };
     }
 
@@ -129,9 +142,11 @@ pub fn advise_with_progress_and_cancel(
             best_moves: Vec::new(),
             progress: SearchProgress::default(),
             warnings: vec!["perspective player missing from snapshot".into()],
+            initial_scores,
         };
     };
 
+    let initial_scores_clone = initial_scores.clone();
     let outcome = search_current_player_turn_with_progress(
         &request.snapshot,
         &player,
@@ -148,6 +163,7 @@ pub fn advise_with_progress_and_cancel(
                 started,
                 AdvisorStatus::Ready,
                 Vec::new(),
+                initial_scores_clone.clone(),
             ));
         },
     );
@@ -161,7 +177,7 @@ pub fn advise_with_progress_and_cancel(
     } else {
         AdvisorStatus::Ready
     };
-    response_from_outcome(&outcome, started, status, warnings)
+    response_from_outcome(&outcome, started, status, warnings, initial_scores)
 }
 
 fn response_from_outcome(
@@ -169,6 +185,7 @@ fn response_from_outcome(
     started: Instant,
     status: AdvisorStatus,
     extra_warnings: Vec<String>,
+    initial_scores: std::collections::HashMap<String, i32>,
 ) -> AdvisorResponseV1 {
     let mut warnings = extra_warnings;
     warnings.extend(outcome.warnings.clone());
@@ -178,6 +195,7 @@ fn response_from_outcome(
         best_moves: outcome.plans.clone(),
         progress: outcome.progress.clone(),
         warnings,
+        initial_scores,
     }
 }
 

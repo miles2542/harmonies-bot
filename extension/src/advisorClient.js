@@ -159,6 +159,8 @@
       elapsedMs: response.elapsedMs || 0,
       progress,
       isFinal,
+      initialScores: response.initialScores || null,
+      perspectivePlayerId: snapshot?.perspectivePlayerId || "",
       bestMove: best
         ? {
             playerId: snapshot?.perspectivePlayerId || "",

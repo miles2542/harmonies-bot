@@ -209,6 +209,15 @@
       renderRecommendationTier(response) {
         if (isFrozen) return;
         this.setStatus(response.status);
+
+        if (response.initialScores && response.perspectivePlayerId) {
+          const pId = response.perspectivePlayerId;
+          const userScore = response.initialScores[pId] ?? 0;
+          const opponentId = Object.keys(response.initialScores).find(id => String(id) !== String(pId));
+          const opponentScore = opponentId ? (response.initialScores[opponentId] ?? 0) : 0;
+          this.setScores(userScore, opponentScore);
+        }
+
         const bestMove = response.bestMove;
         if (!bestMove) {
           root.querySelector(".harmonies-advisor-plans").textContent = "No recommendation";
