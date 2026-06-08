@@ -9,6 +9,7 @@ use crate::{
 static HEURISTIC_MODE: OnceLock<String> = OnceLock::new();
 static SPIRIT_PROX_MULT: OnceLock<f64> = OnceLock::new();
 static SPIRIT_PENALTY_COEFF: OnceLock<f64> = OnceLock::new();
+static COMPENSATION_COEFF: OnceLock<f64> = OnceLock::new();
 
 pub fn get_heuristic_mode() -> &'static str {
     HEURISTIC_MODE.get_or_init(|| {
@@ -32,6 +33,15 @@ pub fn get_spirit_penalty_coeff() -> f64 {
             .ok()
             .and_then(|s| s.parse::<f64>().ok())
             .unwrap_or(-2.5)
+    })
+}
+
+pub fn get_compensation_coeff() -> f64 {
+    *COMPENSATION_COEFF.get_or_init(|| {
+        std::env::var("HARMONIES_COMPENSATION_COEFF")
+            .ok()
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(0.0)
     })
 }
 
@@ -209,9 +219,15 @@ pub fn calculate_height_variance(player: &PlayerState) -> f64 {
     variance
 }
 
-pub fn calculate_wasted_height_penalty(player: &PlayerState) -> f64 {
+pub fn calculate_wasted_height_penalty(
+    player: &PlayerState,
+    exempt_coords: &std::collections::HashSet<crate::model::Coord>,
+) -> f64 {
     let mut wasted = 0.0;
     for cell in &player.cells {
+        if exempt_coords.contains(&cell.coord) {
+            continue;
+        }
         let slice = cell.stack.as_slice();
         if slice.last() == Some(&Color::Trunk) {
             // Uncapped tree
@@ -331,14 +347,21 @@ pub fn calculate_landscape_soft_heuristics(
     score
 }
 
+#[derive(Clone, Debug)]
+pub struct SpiritProximityInfo {
+    pub total_proximity: f64,
+    pub candidate_coords: std::collections::HashSet<crate::model::Coord>,
+}
+
 pub fn calculate_spirit_proximity(
     player: &PlayerState,
     catalog: &CardCatalog,
-) -> f64 {
+) -> SpiritProximityInfo {
     let cells_by_coord: std::collections::HashMap<crate::model::Coord, &crate::model::Cell> =
         player.cells.iter().map(|cell| (cell.coord, cell)).collect();
         
     let mut total_proximity = 0.0;
+    let mut candidate_coords = std::collections::HashSet::new();
     
     for card in player.active_cards.iter().chain(&player.completed_cards) {
         if card.is_spirit {
@@ -346,6 +369,7 @@ pub fn calculate_spirit_proximity(
                 total_proximity += 1.0;
             } else if let Some(definition) = catalog.get(card.type_arg) {
                 let mut max_progress = 0;
+                let mut best_coords = Vec::new();
                 let pattern_len = definition.pattern.len();
                 if pattern_len > 0 {
                     for origin in player.cells.iter().map(|c| c.coord) {
@@ -361,16 +385,21 @@ pub fn calculate_spirit_proximity(
                             }
                             if matched_steps > max_progress {
                                 max_progress = matched_steps;
+                                best_coords = coords.clone();
                             }
                         }
                     }
                     total_proximity += max_progress as f64 / pattern_len as f64;
+                    candidate_coords.extend(best_coords);
                 }
             }
         }
     }
     
-    total_proximity
+    SpiritProximityInfo {
+        total_proximity,
+        candidate_coords,
+    }
 }
 
 pub fn eval_player(
@@ -391,12 +420,13 @@ pub fn eval_player(
     ) / 100.0;
     
     let mode = get_heuristic_mode();
+    let spirit_prox_info = calculate_spirit_proximity(player, catalog);
     let mut completion_prox = calculate_completion_proximity(player, catalog);
     if mode == "dynamic_demand_tuned" {
-        completion_prox += calculate_spirit_proximity(player, catalog) * get_spirit_prox_mult();
+        completion_prox += spirit_prox_info.total_proximity * get_spirit_prox_mult();
     }
     let height_var = calculate_height_variance(player);
-    let wasted_height = calculate_wasted_height_penalty(player);
+    let wasted_height = calculate_wasted_height_penalty(player, &spirit_prox_info.candidate_coords);
     
     let w_completion_prox = morph_weight(
         weights.completion_proximity_early as f64,
@@ -529,8 +559,12 @@ pub fn eval_player(
         player.active_cards.iter().map(|card| {
             if card.is_spirit && card.remaining_cubes > 0 {
                 let filled_hexes = 25.0 - player.empty_hexes as f64;
-                if filled_hexes > 6.0 {
-                    (filled_hexes - 6.0) * get_spirit_penalty_coeff()
+                if filled_hexes >= 12.0 {
+                    // Turn 4+ (12+ tokens)
+                    -40.0 - (filled_hexes - 12.0) * 5.0
+                } else if filled_hexes >= 9.0 {
+                    // Turn 3 (9 tokens)
+                    -15.0
                 } else {
                     0.0
                 }
@@ -538,6 +572,21 @@ pub fn eval_player(
                 0.0
             }
         }).sum::<f64>()
+    } else {
+        0.0
+    };
+
+    let compensation_penalty = if mode == "dynamic_demand_tuned" {
+        let target_animals = 35.0 * t;
+        let target_spirits = 15.0 * t;
+        
+        let current_animals = (breakdown.animals as f64) + calculate_completion_proximity(player, catalog);
+        let current_spirits = spirit_prox_info.total_proximity * 15.0;
+        
+        let def_a = (target_animals - current_animals).max(0.0);
+        let def_s = (target_spirits - current_spirits).max(0.0);
+        
+        def_a * def_s * get_compensation_coeff()
     } else {
         0.0
     };
@@ -551,7 +600,8 @@ pub fn eval_player(
         + space_penalty
         + hand_penalty
         + building_penalty
-        + spirit_incomplete_penalty;
+        + spirit_incomplete_penalty
+        + compensation_penalty;
         
     score_val.round() as i32
 }
