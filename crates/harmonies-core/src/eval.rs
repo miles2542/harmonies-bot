@@ -561,7 +561,7 @@ pub fn eval_player(
                 let filled_hexes = 25.0 - player.empty_hexes as f64;
                 if filled_hexes >= 12.0 {
                     // Turn 4+ (12+ tokens)
-                    -40.0 - (filled_hexes - 12.0) * 5.0
+                    -40.0 + (filled_hexes - 12.0) * get_spirit_penalty_coeff()
                 } else if filled_hexes >= 9.0 {
                     // Turn 3 (9 tokens)
                     -15.0
