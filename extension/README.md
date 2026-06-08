@@ -38,6 +38,17 @@ $env:HARMONIES_SEARCH_THREADS='15'
 cargo run --release -p harmonies-service
 ```
 
+Current Best Configuration (Spirit Focused, Dynamic Demand Tuned):
+
+```powershell
+$env:HARMONIES_HEURISTIC_MODE="dynamic_demand_tuned"
+$env:HARMONIES_WEIGHTS="docs/weights.spirit_focused.json"
+$env:HARMONIES_TT_SIZE="21"
+$env:HARMONIES_ROOT_BEAM="2048"
+$env:HARMONIES_FUTURE_DEPTH="1"
+cargo run --release -p harmonies-service
+```
+
 Current offline best small-sweep search knobs for live QA:
 
 ```powershell
