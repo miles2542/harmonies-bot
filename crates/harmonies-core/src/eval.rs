@@ -7,11 +7,31 @@ use crate::{
 };
 
 static HEURISTIC_MODE: OnceLock<String> = OnceLock::new();
+static SPIRIT_PROX_MULT: OnceLock<f64> = OnceLock::new();
+static SPIRIT_PENALTY_COEFF: OnceLock<f64> = OnceLock::new();
 
 pub fn get_heuristic_mode() -> &'static str {
     HEURISTIC_MODE.get_or_init(|| {
         std::env::var("HARMONIES_HEURISTIC_MODE")
             .unwrap_or_else(|_| "baseline".to_string())
+    })
+}
+
+pub fn get_spirit_prox_mult() -> f64 {
+    *SPIRIT_PROX_MULT.get_or_init(|| {
+        std::env::var("HARMONIES_SPIRIT_PROX_MULT")
+            .ok()
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(1.5)
+    })
+}
+
+pub fn get_spirit_penalty_coeff() -> f64 {
+    *SPIRIT_PENALTY_COEFF.get_or_init(|| {
+        std::env::var("HARMONIES_SPIRIT_PENALTY_COEFF")
+            .ok()
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(-2.5)
     })
 }
 
@@ -373,7 +393,7 @@ pub fn eval_player(
     let mode = get_heuristic_mode();
     let mut completion_prox = calculate_completion_proximity(player, catalog);
     if mode == "dynamic_demand_tuned" {
-        completion_prox += calculate_spirit_proximity(player, catalog) * 1.5;
+        completion_prox += calculate_spirit_proximity(player, catalog) * get_spirit_prox_mult();
     }
     let height_var = calculate_height_variance(player);
     let wasted_height = calculate_wasted_height_penalty(player);
@@ -510,7 +530,7 @@ pub fn eval_player(
             if card.is_spirit && card.remaining_cubes > 0 {
                 let filled_hexes = 25.0 - player.empty_hexes as f64;
                 if filled_hexes > 6.0 {
-                    (filled_hexes - 6.0) * -2.5
+                    (filled_hexes - 6.0) * get_spirit_penalty_coeff()
                 } else {
                     0.0
                 }
