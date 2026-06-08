@@ -152,9 +152,9 @@
       if (id) {
         ids.set(id, key);
       }
-      const orderId = playerOrderIdForPlayer(gamedatas, player);
-      if (orderId) {
-        ids.set(orderId, key);
+      const orderNo = playerOrderNo(gamedatas, player);
+      if (orderNo) {
+        ids.set(orderNo, key);
       }
       inferPlayerIdsFromLocations(player).forEach((inferred) => ids.set(inferred, key));
     });
@@ -162,7 +162,7 @@
   }
 
   function bgaIdsForPlayer(playerId, player, gamedatas, mappedIds) {
-    const ids = [playerId, stringValue(player.id), playerOrderIdForPlayer(gamedatas, player)];
+    const ids = [playerId, stringValue(player.id), playerOrderNo(gamedatas, player)];
     ids.push(...inferPlayerIdsFromLocations(player));
     mappedIds.forEach((mapped, raw) => {
       if (mapped === playerId) {
@@ -564,13 +564,22 @@
     return ids.some((id) => raw === id);
   }
 
-  function playerOrderIdForPlayer(gamedatas, player) {
+  function playerOrderNo(gamedatas, player) {
     const playerNo = numberValue(player.playerNo);
-    if (!playerNo) {
-      return "";
+    if (Number.isFinite(playerNo)) {
+      return String(playerNo);
     }
-    const value = Array.isArray(gamedatas.playerorder) ? gamedatas.playerorder[playerNo - 1] : undefined;
-    return value === undefined || value === null ? "" : String(value);
+    if (Array.isArray(gamedatas?.playerorder) && player.id !== undefined && player.id !== null) {
+      const idx = gamedatas.playerorder.indexOf(Number(player.id));
+      if (idx !== -1) {
+        return String(idx + 1);
+      }
+      const idxStr = gamedatas.playerorder.indexOf(String(player.id));
+      if (idxStr !== -1) {
+        return String(idxStr + 1);
+      }
+    }
+    return "";
   }
 
   function cellKey(playerId, coord) {
@@ -603,7 +612,10 @@
   }
 
   function stringValue(value) {
-    return typeof value === "string" ? value : "";
+    if (value === undefined || value === null) {
+      return "";
+    }
+    return String(value);
   }
 
   function numberValue(value) {
