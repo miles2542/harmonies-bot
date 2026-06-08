@@ -1,9 +1,19 @@
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 
 use crate::{
-    cards::CardCatalog,
+    cards::{CardCatalog, pattern_cells, stack_matches_colors},
     model::{BoardSide, Color, PlayerState, BagCounts},
 };
+
+static HEURISTIC_MODE: OnceLock<String> = OnceLock::new();
+
+pub fn get_heuristic_mode() -> &'static str {
+    HEURISTIC_MODE.get_or_init(|| {
+        std::env::var("HARMONIES_HEURISTIC_MODE")
+            .unwrap_or_else(|_| "baseline".to_string())
+    })
+}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -128,18 +138,31 @@ pub fn morph_weight(early: f64, late: f64, t: f64) -> f64 {
 }
 
 pub fn calculate_completion_proximity(player: &PlayerState, catalog: &CardCatalog) -> f64 {
+    let mode = get_heuristic_mode();
     player
         .active_cards
         .iter()
+        .chain(&player.completed_cards)
         .map(|card| {
             if let Some(def) = catalog.get(card.type_arg) {
-                let total = def.point_locations.len() as f64;
-                if total > 0.0 {
-                    let progress = (total - card.remaining_cubes as f64).max(0.0);
-                    // Add constant bonus of 0.5 to reward holding active cards in hand
-                    progress + 0.5
+                if def.is_spirit {
+                    // Spirits are handled by eval_spirits, just give a flat hand bonus
+                    0.5
                 } else {
-                    0.0
+                    let total = def.point_locations.len() as f64;
+                    if total > 0.0 {
+                        let progress = (total - card.remaining_cubes as f64).max(0.0);
+                        let base = progress + 0.5;
+                        if mode == "h2_soft_relaxed_spirits_animal_scaling" {
+                            let max_vp = *def.point_locations.last().unwrap_or(&0) as f64;
+                            let multiplier = 1.0 + (max_vp - 10.0) * 0.03;
+                            base * multiplier
+                        } else {
+                            base
+                        }
+                    } else {
+                        0.0
+                    }
                 }
             } else {
                 0.0
@@ -193,6 +216,7 @@ pub fn eval_spirits(
         t,
     );
     let thresh = weights.spirit_abandonment_threshold as f64;
+    let mode = get_heuristic_mode();
     
     player
         .active_cards
@@ -212,18 +236,121 @@ pub fn eval_spirits(
             } else {
                 // Incomplete
                 let empty_hexes = player.empty_hexes as f64;
-                let multiplier = if empty_hexes <= thresh {
-                    0.0
-                } else if empty_hexes >= 20.0 {
-                    1.0
+                let multiplier = if mode == "h2_soft_relaxed_spirits"
+                    || mode == "h2_soft_relaxed_spirits_animal_scaling"
+                    || mode == "dynamic_demand"
+                    || mode == "dynamic_demand_space_penalty"
+                    || mode == "dynamic_demand_space_hand_penalty"
+                    || mode == "dynamic_demand_clog_free"
+                    || mode == "dynamic_demand_spirit_guided"
+                    || mode == "dynamic_demand_spirit_guided_clog"
+                    || mode == "dynamic_demand_spirit_guided_clog_space"
+                    || mode == "dynamic_demand_tuned"
+                {
+                    let start_drop = (thresh + 6.0).max(10.0);
+                    if empty_hexes <= thresh {
+                        0.0
+                    } else if empty_hexes >= start_drop {
+                        1.0
+                    } else {
+                        (empty_hexes - thresh) / (start_drop - thresh)
+                    }
                 } else {
-                    (empty_hexes - thresh) / (20.0 - thresh)
+                    if empty_hexes <= thresh {
+                        0.0
+                    } else if empty_hexes >= 20.0 {
+                        1.0
+                    } else {
+                        (empty_hexes - thresh) / (20.0 - thresh)
+                    }
                 };
                 // Scale incomplete spirit value by 0.80 to incentivize actual completion
-                0.80 * multiplier * (potential_score + w_spirit_offset)
+                let scale = if mode == "dynamic_demand_tuned" {
+                    0.40
+                } else {
+                    0.80
+                };
+                scale * multiplier * (potential_score + w_spirit_offset)
             }
         })
         .sum()
+}
+
+pub fn calculate_color_demands(
+    player: &PlayerState,
+    catalog: &CardCatalog,
+) -> std::collections::HashMap<Color, f64> {
+    let mut demands = std::collections::HashMap::new();
+    for card in &player.active_cards {
+        if let Some(def) = catalog.get(card.type_arg) {
+            for step in &def.pattern {
+                for &raw_color in &step.colors {
+                    if let Some(color) = Color::from_bga_type_arg(raw_color) {
+                        *demands.entry(color).or_insert(0.0) += 1.0;
+                    }
+                }
+            }
+        }
+    }
+    demands
+}
+
+pub fn calculate_landscape_soft_heuristics(
+    player: &PlayerState,
+    demands: &std::collections::HashMap<Color, f64>,
+) -> f64 {
+    let mut score = 0.0;
+    for cell in &player.cells {
+        let slice = cell.stack.as_slice();
+        for token in slice {
+            let demand = demands.get(token).copied().unwrap_or(0.0);
+            let soft_val = 0.05 + demand * 0.05;
+            score += soft_val;
+        }
+    }
+    score
+}
+
+pub fn calculate_spirit_proximity(
+    player: &PlayerState,
+    catalog: &CardCatalog,
+) -> f64 {
+    let cells_by_coord: std::collections::HashMap<crate::model::Coord, &crate::model::Cell> =
+        player.cells.iter().map(|cell| (cell.coord, cell)).collect();
+        
+    let mut total_proximity = 0.0;
+    
+    for card in player.active_cards.iter().chain(&player.completed_cards) {
+        if card.is_spirit {
+            if card.remaining_cubes == 0 {
+                total_proximity += 1.0;
+            } else if let Some(definition) = catalog.get(card.type_arg) {
+                let mut max_progress = 0;
+                let pattern_len = definition.pattern.len();
+                if pattern_len > 0 {
+                    for origin in player.cells.iter().map(|c| c.coord) {
+                        for rotation in 0..6 {
+                            let coords = pattern_cells(origin, &definition.pattern, rotation);
+                            let mut matched_steps = 0;
+                            for (coord, step) in coords.iter().zip(&definition.pattern) {
+                                if let Some(cell) = cells_by_coord.get(coord) {
+                                    if stack_matches_colors(&cell.stack, &step.colors) {
+                                        matched_steps += 1;
+                                    }
+                                }
+                            }
+                            if matched_steps > max_progress {
+                                max_progress = matched_steps;
+                            }
+                        }
+                    }
+                    total_proximity += max_progress as f64 / pattern_len as f64;
+                }
+            }
+        }
+    }
+    
+    total_proximity
 }
 
 pub fn eval_player(
@@ -243,7 +370,11 @@ pub fn eval_player(
         t,
     ) / 100.0;
     
-    let completion_prox = calculate_completion_proximity(player, catalog);
+    let mode = get_heuristic_mode();
+    let mut completion_prox = calculate_completion_proximity(player, catalog);
+    if mode == "dynamic_demand_tuned" {
+        completion_prox += calculate_spirit_proximity(player, catalog) * 1.5;
+    }
     let height_var = calculate_height_variance(player);
     let wasted_height = calculate_wasted_height_penalty(player);
     
@@ -264,12 +395,143 @@ pub fn eval_player(
     );
     
     let spirits_eval = eval_spirits(player, catalog, weights, t);
+    let landscape_soft = if mode != "baseline" {
+        let mut demands = if mode == "dynamic_demand"
+            || mode == "dynamic_demand_space_penalty"
+            || mode == "dynamic_demand_space_hand_penalty"
+            || mode == "dynamic_demand_clog_free"
+            || mode == "dynamic_demand_spirit_guided"
+            || mode == "dynamic_demand_spirit_guided_clog"
+            || mode == "dynamic_demand_spirit_guided_clog_space"
+            || mode == "dynamic_demand_tuned"
+        {
+            calculate_color_demands(player, catalog)
+        } else {
+            // Mock demands to match static H2 soft values: Mountain=0.3, Water=0.4, Field=0.2
+            let mut map = std::collections::HashMap::new();
+            map.insert(Color::Mountain, 5.0);
+            map.insert(Color::Water, 7.0);
+            map.insert(Color::Field, 3.0);
+            map
+        };
+
+        if mode == "dynamic_demand_spirit_guided"
+            || mode == "dynamic_demand_spirit_guided_clog"
+            || mode == "dynamic_demand_spirit_guided_clog_space"
+            || mode == "dynamic_demand_tuned"
+        {
+            for card in &player.active_cards {
+                if card.is_spirit {
+                    match card.type_arg {
+                        33 | 34 => {
+                            *demands.entry(Color::Field).or_insert(0.0) += 8.0;
+                        }
+                        35 | 36 => {
+                            *demands.entry(Color::Trunk).or_insert(0.0) += 4.0;
+                            *demands.entry(Color::Foliage).or_insert(0.0) += 4.0;
+                        }
+                        37 | 38 => {
+                            *demands.entry(Color::Building).or_insert(0.0) += 8.0;
+                        }
+                        39 | 40 => {
+                            *demands.entry(Color::Mountain).or_insert(0.0) += 8.0;
+                        }
+                        41 | 42 => {
+                            *demands.entry(Color::Water).or_insert(0.0) += 8.0;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        calculate_landscape_soft_heuristics(player, &demands)
+    } else {
+        0.0
+    };
     
+    let space_penalty = if (mode == "dynamic_demand_space_penalty"
+        || mode == "dynamic_demand_space_hand_penalty"
+        || mode == "dynamic_demand_spirit_guided_clog_space"
+        || mode == "dynamic_demand_tuned")
+        && t > 0.8
+    {
+        (t - 0.8) * player.empty_hexes as f64 * -5.0
+    } else {
+        0.0
+    };
+
+    let hand_penalty = if mode == "dynamic_demand_space_hand_penalty" {
+        player.active_cards.iter().map(|card| {
+            if card.is_spirit {
+                0.0
+            } else {
+                card.remaining_cubes as f64 * -0.3
+            }
+        }).sum::<f64>()
+    } else if mode == "dynamic_demand_clog_free"
+        || mode == "dynamic_demand_spirit_guided_clog"
+        || mode == "dynamic_demand_spirit_guided_clog_space"
+        || mode == "dynamic_demand_tuned"
+    {
+        let cubes_penalty: f64 = player.active_cards.iter().map(|card| {
+            if card.is_spirit {
+                0.0
+            } else {
+                card.remaining_cubes as f64 * -0.3
+            }
+        }).sum();
+        let active_count = player.active_cards.iter().filter(|c| !c.is_spirit).count();
+        let count_penalty = if active_count >= 3 {
+            -10.0
+        } else if active_count >= 2 {
+            -3.0
+        } else {
+            0.0
+        };
+        cubes_penalty + count_penalty
+    } else {
+        0.0
+    };
+    
+    let building_penalty = if mode == "dynamic_demand_tuned" {
+        let building_count = player
+            .cells
+            .iter()
+            .filter(|c| c.stack.top() == Some(Color::Building))
+            .count() as f64;
+        building_count * -1.2
+    } else {
+        0.0
+    };
+
+    let spirit_incomplete_penalty = if mode == "dynamic_demand_tuned" {
+        player.active_cards.iter().map(|card| {
+            if card.is_spirit && card.remaining_cubes > 0 {
+                let filled_hexes = 25.0 - player.empty_hexes as f64;
+                if filled_hexes > 6.0 {
+                    (filled_hexes - 6.0) * -2.5
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            }
+        }).sum::<f64>()
+    } else {
+        0.0
+    };
+
     let score_val = bga_score_no_spirits as f64 * w_self_score
         + completion_prox * w_completion_prox
         + height_var * w_height_var
         + wasted_height * w_wasted_height
-        + spirits_eval;
+        + spirits_eval
+        + landscape_soft
+        + space_penalty
+        + hand_penalty
+        + building_penalty
+        + spirit_incomplete_penalty;
         
     score_val.round() as i32
 }
