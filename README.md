@@ -4,13 +4,11 @@
 
 Harmonies advisor for Board Game Arena (BGA).
 
-It reads the visible/current Harmonies table state, sends a frozen snapshot to a local Rust advisor,
-and overlays suggested actions on top of the BGA page. It does **not** click, send BGA actions, or
-play the game for you. You still decide what to do and execute moves manually.
+It reads the visible/current Harmonies table state, sends a frozen snapshot to a local Rust advisor, and overlays suggested actions on top of the BGA page. It does **not** click, send BGA actions, or play the game for you. You still decide what to do and execute moves manually.
 
-This started as a personal project: can I build a Harmonies helper that reads the real BGA page, models the rules faithfully, and produces useful move recommendations fast enough for live games?
+Started as a lingering thought: surely I can make a bot that plays better than I do since it should be able to calculate all moves and look a bit into the future to somehow maximize overlapping patterns scoring right?
 
-Short answer: mostly yes on plumbing and correctness, not yes on "superhuman bot" yet.
+Short answer: well, not really. It works, but to call it superhuman would be an extreme stretch lol.
 
 ## Status
 
@@ -23,58 +21,46 @@ What works:
 - DOM-first state reading from live/spectated BGA games.
 - Current-turn legal move generation, including interleaved token placement, optional card draft,
   Spirit choice, and animal cube settlement.
-- Side A and Side B scoring model, with Side A 2p Nature Spirit as main target.
+- Side A and Side B scoring model *(which is extracted and reuse in a standalone child project, see below)*
 - Score parity checks against real BGA final-score captures.
 - Fixture/capture tooling for debugging BGA DOM/gamedatas mismatch.
 - Search/heuristic experiments, transposition table, phase-dependent evaluation, tuned weight files.
 
 What does not work enough for my original ambition:
 
-- It does not consistently outperform good human Harmonies players.
-- It is not packaged as a self-contained extension. No WASM build path yet.
+- Does not consistently outperform good human Harmonies players. It might reach 140+ points, which is really high for human players even under lucky circumstances, but on average it only achieves ~90-100 points.
+- Not yet packaged as a self-contained extension. No WASM build path yet - must still run Rust backend separately.
 - The current approach is still a heuristic/tree-search advisor, not a deeply trained strategy engine.
-- Future card/token uncertainty is approximated, not solved.
-- Macro-strategy is still thin. It can see tactical/near-future value better than long-term plan shape.
+- Macro-strategy is still thin. It can see tactical/near-future value better than long-term plan shape. If increase depth too much, it just lose sight and focus more on what could be rather than what is, generally leading to lower scores.
 
-So this repo is left as a solid base and a record of the work, not as a finished "destroy everyone"
-bot. Painful but fair.
+So this repo is left as the base and a record of the work, not as a finished "destroy everyone" bot. Building game bots are hard man.
 
 Related child project:
 
 - [miles2542/harmonies-bga-score-display](https://github.com/miles2542/harmonies-bga-score-display) -
-  a smaller standalone Firefox extension extracted from this work. It only shows live score, no move advice. A much more practical and useful product for most people, if you play Harmonies on BGA, you should have a look at it!
+  a smaller standalone Firefox extension extracted from this work. It only shows live score, no move advice. A much more practical and useful product for most people, if you play Harmonies on BGA, you really should have a look at it!
 
 ## Why This Exists
 
-BGA does not expose a detailed live Harmonies score breakdown during a game, and Harmonies has enough
-spatial/card interactions that "what should I do this turn?" is not always obvious.
-
 I wanted:
 
-- Accurate rule/scoring simulator.
-- Real BGA state parsing, not hand-entered board data.
-- A floating panel with the recommended sequence.
-- Visual indicators on the actual BGA board/card/group UI.
-- Read-only behavior. No action automation.
-- Ideally, strong enough suggestions to beat my own play.
+- Accurate rule/scoring simulator so I know what the current scores for all participants are, not wait until game ends to get score result.
+- Automatic BGA state parsing and analyzing upon active turn, or manual control in spectating matches.
+- Visual overlay elements to show clearly what steps there are, what card and token group to take, where to place, etc. for every step.
+- Read-only behavior. No action automation. For one, because it's not yet superhuman. For another, because it should only act as a reference point, not auto-play for you, it's already in grey enough of a zone with regards to BGA's Fair Play policy.
+- Ideally, strong enough suggestions to beat my own play, and my friends:) that was actually the original ultimate goal.
 
-The project got a long way through the engineering part. Strategy quality is the unfinished frontier.
+Engineering/infrastructure part is mostly finished, room for improvements are almost exclusively on moves quality.
 
 ## Progress Over Time
 
-This was not built from synthetic toy states only. A big part of the project was making the bot stare
-at actual BGA pages and proving it understood them.
+Quick overview/keeping track of the project progress:
 
-Main milestones:
-
-- Gathered BGA `gameui.gamedatas` snapshots from tutorial, real active games, spectated games, and
-  post-game screens.
+- Gathered BGA `gameui.gamedatas` snapshots from tutorial, real active games, spectated games, and post-game screens.
 - Built capture and inspector userscripts:
   - `tools/bga_harmonies_capture.user.js`
   - `tools/bga_harmonies_group_inspector.user.js`
-- Found that raw `gamedatas` can lag behind the visible board. DOM became the preferred source for:
-  central token groups, player boards, visible cards, completed cards, river cards, Spirit choices,
-  and cube counts.
+- Found that raw `gamedatas` can lag behind the visible board. DOM became the preferred (prioritized) source for: central token groups, player boards, visible cards, completed cards, river cards, Spirit choices, and cube counts.
 - Built the Rust rules/scoring core:
   - token placement legality
   - stack rules
@@ -84,8 +70,7 @@ Main milestones:
   - Side A river scoring
   - Side B island scoring
   - trees, mountains, fields, buildings
-- Matched scorer output against real BGA final scores. The tracked score-parity corpus covers five
-  Side A 2p Nature Spirit final games.
+- Matched scorer output against real BGA final scores. The tracked score-parity corpus covers five Side A 2p Nature Spirit as the base, but then added side B testing to match the scoring for all scenarios perfectly with BGA's Harmonies.
 - Built native advisor service and Firefox overlay.
 - Added visual overlays:
   - central group highlight
@@ -100,17 +85,19 @@ Main milestones:
   - service smoke test
   - benchmark and sweep scripts
 - Tried many search/evaluation variants:
-  - deeper lookahead
+  - deeper lookahead, shallower lookahead, no lookahead (greedy)
   - root/future beam sweeps
   - transposition table
   - denial heuristics
   - phase-dependent weights
-  - Spirit-focused scoring
+  - Spirit-focused scoring, punishment, encouragement
   - proximity and height-shape penalties
   - SPSA/self-play tournament scripts
+  - auto weights tuning
 
-Best practical config became "decent and useful", not "dominates strong players". Current conclusion:
-more brute-force heuristic tweaking probably has diminishing returns.
+Best practical config became somewhat decent, but still not strong enough to defeat decent players. 
+> [!IMPORTANT] Current conclusion
+> More brute-force heuristic tweaking has diminishing returns, might even lead to worse results. Almost all of the experiements **converges** to roughly **80-90 points average**, and **130-145 points max**, which strongly suggests (I think) there is a **fundamental limitations with current approach** and requires something drastic to have meaningful improvements.
 
 ## Results / Evidence
 
@@ -125,29 +112,56 @@ Correctness and performance checks that mattered:
 
 Performance work:
 
-- Cached frontier scoring cut one hard full-hand fixture's root generation from roughly `7.1s` to
-  `2.9s`, and first-answer time from roughly `9.2s` to `3.7s`.
-- With the later tuned config, the advisor usually returns fast enough for live use on my machine.
-- It still does not prove stronger-than-human play.
+- Cached frontier scoring cut one hard full-hand fixture's root generation from roughly `7.1s` to `2.9s`, and first-answer time from roughly `9.2s` to `3.7s` *(old benchmark result, should be faster now, even with 8192 root beam searches)*.
+- With the later tuned config, the advisor is fast enough for live use on my machine. Actually with BGA's Fast game speed, we have 3 minutes bank time maximum, and each turn will add 51 seconds to do whatever we want, and 51 completely free 51 seconds is an eternity with Rust, able to hit depth 7-8 consistently.
+- It still does not prove stronger-than-human play:)
 
 Strategy work:
 
 - Many weight/search configurations were tried.
 - The current best practical mode is Spirit-focused and dynamically demand-tuned.
-- Still missing: robust macro strategy, stronger long-term animal-card planning, and better adversarial
-  modeling.
+- Still missing: robust macro strategy, stronger long-term animal-card planning, and better adversarial modeling (but less of an issue, mainly self-scoring focus is needed).
 
 ## Architecture
 
-```text
-BGA page
-  -> Firefox content script
-  -> DOM + gamedatas visible-state reader
-  -> GameSnapshotV1
-  -> localhost Rust service
-  -> harmonies-core search/scoring
-  -> streamed AdvisorResponseV1
-  -> overlay panel + board/card indicators
+```mermaid
+flowchart TD
+    %% Subgraph for Browser / Frontend
+    subgraph Browser ["Web Browser (BGA)"]
+        style Browser fill:#f9fafb,stroke:#e5e7eb,stroke-width:2px,color:#374151
+        
+        BGA["BGA Game Page"]
+        CS["Firefox Content Script"]
+        Reader["DOM & gamedatas Reader"]
+        UI["Overlay Panel & Indicators"]
+        
+        BGA --> CS
+        CS --> Reader
+        UI -.->|"Injects Visuals"| BGA
+    end
+
+    %% Subgraph for Local Backend
+    subgraph Local ["Local Environment"]
+        style Local fill:#f3f4f6,stroke:#e5e7eb,stroke-width:2px,color:#374151
+        
+        Rust["Localhost Rust Service"]
+        Core["harmonies-core<br/>(Search & Scoring)"]
+        
+        Rust <--> Core
+    end
+
+    %% Data Flow Connections
+    Reader ==>|"GameSnapshotV1 (POST)"| Rust
+    Rust ==>|"streamed AdvisorResponseV1"| CS
+    CS --> UI
+
+    %% Styling Elements
+    classDef default fill:#ffffff,stroke:#d1d5db,stroke-width:1px,color:#1f2937;
+    classDef highlight fill:#eff6ff,stroke:#3b82f6,stroke-width:1.5px,color:#1e3a8a;
+    classDef engine fill:#f0fdf4,stroke:#16a34a,stroke-width:1.5px,color:#14532d;
+    
+    class BGA,UI highlight;
+    class Core engine;
 ```
 
 Crates:
