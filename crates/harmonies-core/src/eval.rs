@@ -10,6 +10,9 @@ static HEURISTIC_MODE: OnceLock<String> = OnceLock::new();
 static SPIRIT_PROX_MULT: OnceLock<f64> = OnceLock::new();
 static SPIRIT_PENALTY_COEFF: OnceLock<f64> = OnceLock::new();
 static COMPENSATION_COEFF: OnceLock<f64> = OnceLock::new();
+static FORCE_SPIRIT_LIMIT: OnceLock<Option<f64>> = OnceLock::new();
+static COMMIT_WEIGHT: OnceLock<f64> = OnceLock::new();
+static CLOG_WEIGHT: OnceLock<f64> = OnceLock::new();
 
 pub fn get_heuristic_mode() -> &'static str {
     HEURISTIC_MODE.get_or_init(|| {
@@ -23,7 +26,7 @@ pub fn get_spirit_prox_mult() -> f64 {
         std::env::var("HARMONIES_SPIRIT_PROX_MULT")
             .ok()
             .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(1.5)
+            .unwrap_or(2.5)
     })
 }
 
@@ -32,13 +35,40 @@ pub fn get_spirit_penalty_coeff() -> f64 {
         std::env::var("HARMONIES_SPIRIT_PENALTY_COEFF")
             .ok()
             .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(-2.5)
+            .unwrap_or(-4.0)
     })
 }
 
 pub fn get_compensation_coeff() -> f64 {
     *COMPENSATION_COEFF.get_or_init(|| {
         std::env::var("HARMONIES_COMPENSATION_COEFF")
+            .ok()
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(-0.15)
+    })
+}
+
+pub fn get_force_spirit_limit() -> Option<f64> {
+    *FORCE_SPIRIT_LIMIT.get_or_init(|| {
+        std::env::var("HARMONIES_FORCE_SPIRIT_LIMIT")
+            .ok()
+            .and_then(|s| s.parse::<f64>().ok())
+            .or(Some(5.0))
+    })
+}
+
+pub fn get_commit_weight() -> f64 {
+    *COMMIT_WEIGHT.get_or_init(|| {
+        std::env::var("HARMONIES_COMMIT_WEIGHT")
+            .ok()
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(15.0)
+    })
+}
+
+pub fn get_clog_weight() -> f64 {
+    *CLOG_WEIGHT.get_or_init(|| {
+        std::env::var("HARMONIES_CLOG_WEIGHT")
             .ok()
             .and_then(|s| s.parse::<f64>().ok())
             .unwrap_or(0.0)
@@ -347,6 +377,35 @@ pub fn calculate_landscape_soft_heuristics(
     score
 }
 
+// Helper for step-by-step spirit proximity gradient
+pub fn stack_partial_match_fraction(stack: &crate::model::Stack, colors: &[u8]) -> f64 {
+    if colors.is_empty() {
+        return 0.0;
+    }
+    if colors == [6, 7] { // Special building colors
+        if stack.top() == Some(Color::Building) {
+            return 1.0;
+        } else {
+            return 0.0;
+        }
+    }
+    let h = stack.height();
+    if h > colors.len() {
+        return 0.0; // Too tall
+    }
+    for j in 0..h {
+        let expected_raw = colors[colors.len() - 1 - j];
+        let expected = match Color::from_bga_type_arg(expected_raw) {
+            Some(c) => c,
+            None => return 0.0,
+        };
+        if stack.as_slice()[j] != expected {
+            return 0.0; // Mismatch
+        }
+    }
+    h as f64 / colors.len() as f64
+}
+
 #[derive(Clone, Debug)]
 pub struct SpiritProximityInfo {
     pub total_proximity: f64,
@@ -368,28 +427,32 @@ pub fn calculate_spirit_proximity(
             if card.remaining_cubes == 0 {
                 total_proximity += 1.0;
             } else if let Some(definition) = catalog.get(card.type_arg) {
-                let mut max_progress = 0;
+                let mut max_progress = 0.0;
                 let mut best_coords = Vec::new();
                 let pattern_len = definition.pattern.len();
                 if pattern_len > 0 {
                     for origin in player.cells.iter().map(|c| c.coord) {
                         for rotation in 0..6 {
                             let coords = pattern_cells(origin, &definition.pattern, rotation);
-                            let mut matched_steps = 0;
+                            let mut matched_steps = 0.0;
+                            let mut is_blocked = false;
                             for (coord, step) in coords.iter().zip(&definition.pattern) {
                                 if let Some(cell) = cells_by_coord.get(coord) {
-                                    if stack_matches_colors(&cell.stack, &step.colors) {
-                                        matched_steps += 1;
+                                    // ignore blocked placements
+                                    if cell.locked_by_cube && (step.allow_cube || !stack_matches_colors(&cell.stack, &step.colors)) {
+                                        is_blocked = true;
+                                        break;
                                     }
+                                    matched_steps += stack_partial_match_fraction(&cell.stack, &step.colors);
                                 }
                             }
-                            if matched_steps > max_progress {
+                            if !is_blocked && matched_steps > max_progress {
                                 max_progress = matched_steps;
                                 best_coords = coords.clone();
                             }
                         }
                     }
-                    total_proximity += max_progress as f64 / pattern_len as f64;
+                    total_proximity += max_progress / pattern_len as f64;
                     candidate_coords.extend(best_coords);
                 }
             }
@@ -401,6 +464,57 @@ pub fn calculate_spirit_proximity(
         candidate_coords,
     }
 }
+
+pub fn calculate_card_progress(
+    card: &crate::ActiveCard,
+    player: &PlayerState,
+    catalog: &CardCatalog,
+) -> f64 {
+    if card.remaining_cubes == 0 {
+        return 1.0;
+    }
+    if card.is_spirit {
+        if let Some(definition) = catalog.get(card.type_arg) {
+            let cells_by_coord: std::collections::HashMap<crate::model::Coord, &crate::model::Cell> =
+                player.cells.iter().map(|cell| (cell.coord, cell)).collect();
+            let mut max_progress = 0.0;
+            let pattern_len = definition.pattern.len();
+            if pattern_len > 0 {
+                for origin in player.cells.iter().map(|c| c.coord) {
+                    for rotation in 0..6 {
+                        let coords = pattern_cells(origin, &definition.pattern, rotation);
+                        let mut matched_steps = 0.0;
+                        let mut is_blocked = false;
+                        for (coord, step) in coords.iter().zip(&definition.pattern) {
+                            if let Some(cell) = cells_by_coord.get(coord) {
+                                if cell.locked_by_cube && (step.allow_cube || !stack_matches_colors(&cell.stack, &step.colors)) {
+                                    is_blocked = true;
+                                    break;
+                                }
+                                matched_steps += stack_partial_match_fraction(&cell.stack, &step.colors);
+                            }
+                        }
+                        if !is_blocked && matched_steps > max_progress {
+                            max_progress = matched_steps;
+                        }
+                    }
+                }
+                return max_progress / pattern_len as f64;
+            }
+        }
+        0.0
+    } else {
+        if let Some(def) = catalog.get(card.type_arg) {
+            let total = def.point_locations.len() as f64;
+            if total > 0.0 {
+                let progress = (total - card.remaining_cubes as f64).max(0.0);
+                return progress / total;
+            }
+        }
+        0.0
+    }
+}
+
 
 pub fn eval_player(
     player: &PlayerState,
@@ -559,12 +673,8 @@ pub fn eval_player(
         player.active_cards.iter().map(|card| {
             if card.is_spirit && card.remaining_cubes > 0 {
                 let filled_hexes = 25.0 - player.empty_hexes as f64;
-                if filled_hexes >= 12.0 {
-                    // Turn 4+ (12+ tokens)
-                    -40.0 + (filled_hexes - 12.0) * get_spirit_penalty_coeff()
-                } else if filled_hexes >= 9.0 {
-                    // Turn 3 (9 tokens)
-                    -15.0
+                if filled_hexes > 6.0 {
+                    (filled_hexes - 6.0) * get_spirit_penalty_coeff()
                 } else {
                     0.0
                 }
@@ -591,6 +701,67 @@ pub fn eval_player(
         0.0
     };
 
+    let force_spirit_penalty = if let Some(limit_turns) = get_force_spirit_limit() {
+        let filled_hexes = 25.0 - player.empty_hexes as f64;
+        let limit_hexes = limit_turns * 3.0;
+        if filled_hexes >= limit_hexes {
+            player.active_cards.iter().map(|card| {
+                if card.is_spirit && card.remaining_cubes > 0 {
+                    -300.0
+                } else {
+                    0.0
+                }
+            }).sum::<f64>()
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    };
+
+    let mut hysteresis_bonus = 0.0;
+    let mut diversification_penalty = 0.0;
+    if mode == "dynamic_demand_tuned" {
+        let mut started_before_count = 0;
+        for card in &player.active_cards {
+            if !card.is_spirit {
+                if let Some(def) = catalog.get(card.type_arg) {
+                    let total = def.point_locations.len();
+                    if card.remaining_cubes < total as u8 {
+                        started_before_count += 1;
+                    }
+                }
+            }
+        }
+
+        let w_commit = get_commit_weight();
+        let u_clog = get_clog_weight();
+
+        for card in &player.active_cards {
+            let p = calculate_card_progress(card, player, catalog);
+            if p > 0.0 && p < 1.0 {
+                // Hysteresis Bonus: W_commit * (P_i)^2
+                hysteresis_bonus += w_commit * p * p;
+            }
+            
+            // Diversification Penalty
+            if started_before_count >= 2 {
+                let is_started_before = if card.is_spirit {
+                    false
+                } else if let Some(def) = catalog.get(card.type_arg) {
+                    let total = def.point_locations.len();
+                    card.remaining_cubes < total as u8
+                } else {
+                    false
+                };
+
+                if !is_started_before && p > 0.0 {
+                    diversification_penalty += -u_clog * p;
+                }
+            }
+        }
+    }
+ 
     let score_val = bga_score_no_spirits as f64 * w_self_score
         + completion_prox * w_completion_prox
         + height_var * w_height_var
@@ -601,7 +772,10 @@ pub fn eval_player(
         + hand_penalty
         + building_penalty
         + spirit_incomplete_penalty
-        + compensation_penalty;
+        + compensation_penalty
+        + force_spirit_penalty
+        + hysteresis_bonus
+        + diversification_penalty;
         
     score_val.round() as i32
 }

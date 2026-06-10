@@ -1,0 +1,19 @@
+{
+  "version": "refined-2026-06-07-spirit-focused",
+  "selfScorePercent": 100,
+  "opponentDenialPercent": 20,
+  "selfScorePercentEarly": 100,
+  "selfScorePercentLate": 100,
+  "opponentDenialPercentEarly": 10,
+  "opponentDenialPercentLate": 20,
+  "completionProximityEarly": 15,
+  "completionProximityLate": 5,
+  "heightVarianceEarly": -5,
+  "heightVarianceLate": -10,
+  "wastedHeightPenaltyEarly": -2,
+  "wastedHeightPenaltyLate": -10,
+  "spiritOffsetEarly": 25,
+  "spiritOffsetLate": 15,
+  "spiritAbandonmentThreshold": 4,
+  "denialExponent": 120
+}

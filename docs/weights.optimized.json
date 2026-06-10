@@ -1,0 +1,19 @@
+{
+  "version": "refined-spsa-k31",
+  "selfScorePercent": 100,
+  "opponentDenialPercent": 47,
+  "selfScorePercentEarly": 70,
+  "selfScorePercentLate": 162,
+  "opponentDenialPercentEarly": 95,
+  "opponentDenialPercentLate": 59,
+  "completionProximityEarly": 11,
+  "completionProximityLate": 83,
+  "heightVarianceEarly": -61,
+  "heightVarianceLate": -8,
+  "wastedHeightPenaltyEarly": -139,
+  "wastedHeightPenaltyLate": -133,
+  "spiritOffsetEarly": -37,
+  "spiritOffsetLate": 124,
+  "spiritAbandonmentThreshold": 25,
+  "denialExponent": 139
+}

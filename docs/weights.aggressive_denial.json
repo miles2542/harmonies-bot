@@ -1,0 +1,19 @@
+{
+  "version": "refined-2026-06-07-denial",
+  "selfScorePercent": 100,
+  "opponentDenialPercent": 80,
+  "selfScorePercentEarly": 100,
+  "selfScorePercentLate": 100,
+  "opponentDenialPercentEarly": 80,
+  "opponentDenialPercentLate": 120,
+  "completionProximityEarly": 15,
+  "completionProximityLate": 5,
+  "heightVarianceEarly": -5,
+  "heightVarianceLate": -10,
+  "wastedHeightPenaltyEarly": -2,
+  "wastedHeightPenaltyLate": -10,
+  "spiritOffsetEarly": 10,
+  "spiritOffsetLate": 2,
+  "spiritAbandonmentThreshold": 4,
+  "denialExponent": 120
+}
